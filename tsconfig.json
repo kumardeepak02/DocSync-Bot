@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/docsync-core" },
+    { "path": "packages/docsync-cli" },
+    { "path": "packages/docsync-vscode-extension" }
+  ]
+}

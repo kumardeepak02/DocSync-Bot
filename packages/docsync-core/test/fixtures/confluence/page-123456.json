@@ -1,0 +1,13 @@
+{
+  "id": "123456",
+  "title": "Math Utilities",
+  "body": {
+    "storage": {
+      "value": "<h2>add(a, b)</h2><p>Adds two numbers together and returns the sum.</p><ul><li>a (number)</li><li>b (number)</li></ul><p>Returns: number</p>",
+      "representation": "storage"
+    }
+  },
+  "version": {
+    "number": 3
+  }
+}
