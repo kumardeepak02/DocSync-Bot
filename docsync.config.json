@@ -1,0 +1,6 @@
+{
+  "excludePaths": ["node_modules/**", "dist/**", "**/*.test.ts", "**/test/fixtures/**"],
+  "enabledAdapters": ["docstring", "markdown", "openapi", "confluence"],
+  "blockingSeverity": "high",
+  "confluenceLinks": []
+}

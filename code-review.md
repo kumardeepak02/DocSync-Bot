@@ -1,0 +1,20 @@
+# DocSync-Bot — Code Review (Step 6)
+
+Self-review of the Step 5 implementation, performed before opening the PR, using the capstone's required
+checklist. Issues found during this pass were fixed directly in the implementation (not left as follow-ups),
+and the tests below confirm the fixes.
+
+| Review Area | Review Question | Finding | Resolution |
+|---|---|---|---|
+| **Correctness** | Does each component behave as specified in `requirements.md`? | The Python signature regex (`PY_DEF_RE` / docstring adapter's `defRe`) only matched `def foo(...)`, silently skipping `async def foo(...)` — a real correctness bug for any async Python codebase. | Fixed both regexes to `^(?:async\s+)?def\s+...`; added a regression test (`diffAnalyzer.test.ts`, "matches 'async def' functions"). |
+| **Security** | Are secrets excluded from output? Is user input validated? | `redactSecrets()` is applied to the outbound LLM prompt (verified by test), credentials are only ever read from env vars/`.env` (gitignored), and `.gitignore` excludes `.env`. Confirmed no path in the codebase logs `GITHUB_MODELS_TOKEN`/Confluence credentials. | No change needed; confirmed via `redactSecrets.test.ts` and `suggestionEngine.test.ts` ("redacts secrets embedded in the existing doc content"). |
+| **Error Handling** | Are all API failures, missing files, and empty repos handled gracefully? | Confluence fetch failures and malformed OpenAPI/YAML files in the repo scan were wrapped in `try/catch` in `collectDocs`, but neither branch had a test proving the whole run still completes. Missing/malformed `docsync.config.json` was already tested. | Added `integration.test.ts` cases: "does not crash when the repo contains a non-OpenAPI YAML file" and "degrades gracefully when the Confluence client fails" — both now pass. |
+| **Test Coverage** | Do tests cover the happy path AND the 'Not Found' / missing-field edge cases? | Adapters had happy-path tests but no "nothing found" cases (Markdown with no `docsync:ref`, OpenAPI operation with no `x-docsync-ref`, Confluence page with no parameter bullets). `GitDiffSource`'s added/removed-file branches were only exercised indirectly. | Added explicit "no match" tests to `adapters.test.ts` and a dedicated `gitSource.test.ts` covering added-file (`baseContent` undefined) and removed-file (`headContent` undefined) cases. Suite grew from 62 → 70 tests, all passing. |
+| **Code Clarity** | Are function names self-explanatory? Is logic easy to follow without comments? | Generally yes; names like `detectDrift`, `resolveLinks`, `redactSecrets`, `checkRepo` are self-describing. A few regex-heavy functions (Python docstring parsing) rely on inline comments, which is appropriate given the regex density. | No change needed. |
+| **DRY Principle** | Is there duplicated logic that can be refactored into a shared function? | `languageParsers.ts` (`parseTypeScript`) and `docstringAdapter.ts` (`parseTsDocModels`) each independently walked `sourceFile.getFunctions()` / `getClasses().getMethods()` with the same traversal shape — duplicated logic. | Extracted `forEachTsFunctionLike()` in `languageParsers.ts` and had both call sites reuse it. Verified no behavior change (all adapter + diff tests still pass). |
+| **Dependency Safety** | Does Copilot flag any known-vulnerable package versions? | `npm audit` initially reported 2 **critical** advisories via `simple-git@3.27` (`@simple-git/argv-parser` unsafe `VISUAL` editor detection). | Bumped `simple-git` to `^4.0.2` (critical findings resolved: `npm audit` now shows 0 critical/high/moderate). Remaining 7 **low**-severity advisories are all in transitive `jest`/`ts-jest` dev dependencies (not shipped in any published artifact) — accepted as a documented known limitation rather than downgrading the test toolchain. |
+
+## Summary
+All findings from this review were fixed directly (not deferred), and are reflected in the commit history. Final
+state: 70/70 tests passing, clean `tsc --build` across all 3 workspace packages, 0 critical/high/moderate `npm
+audit` findings.
