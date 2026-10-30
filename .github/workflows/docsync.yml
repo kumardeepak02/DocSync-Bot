@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build docsync-core
-        run: npm run build --workspace=docsync-core
+      - name: Build workspace packages
+        run: npm run build --workspace=docsync-core --workspace=docsync-cli
 
       - name: Run DocSync-Bot check
         id: docsync
@@ -50,7 +50,10 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const body = fs.readFileSync('docsync-report.md', 'utf-8');
+            let body = fs.existsSync('docsync-report.md') ? fs.readFileSync('docsync-report.md', 'utf-8').trim() : '';
+            if (!body) {
+              body = '⚠️ **DocSync-Bot**: the check step produced no output (it may have errored before generating a report). Check the workflow logs for details.';
+            }
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
