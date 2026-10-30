@@ -40,6 +40,11 @@ export function add(a: number, b: number): number {
 });
 
 describe("MarkdownAdapter", () => {
+  it("returns an empty array when there is no docsync:ref section", () => {
+    const models = MarkdownAdapter.parse("# Just a plain README\n\nNo special markers here.", "README.md");
+    expect(models).toHaveLength(0);
+  });
+
   it("parses a docsync:ref section into a DocModel", () => {
     const content = fixture("markdown", "README.md");
     const models = MarkdownAdapter.parse(content, "README.md");
@@ -62,6 +67,12 @@ describe("MarkdownAdapter", () => {
 });
 
 describe("OpenApiAdapter", () => {
+  it("skips operations with no x-docsync-ref vendor extension", () => {
+    const content = `openapi: 3.0.3\ninfo:\n  title: t\n  version: "1.0.0"\npaths:\n  /health:\n    get:\n      summary: liveness check\n`;
+    const models = OpenApiAdapter.parse(content, "unrelated.yaml");
+    expect(models).toHaveLength(0);
+  });
+
   it("parses an operation carrying x-docsync-ref", () => {
     const content = fixture("openapi", "sample.yaml");
     const models = OpenApiAdapter.parse(content, "sample.yaml");
@@ -72,6 +83,17 @@ describe("OpenApiAdapter", () => {
 });
 
 describe("ConfluenceAdapter", () => {
+  it("returns an empty params list when the page body has no parameter bullets", () => {
+    const content = JSON.stringify({
+      id: "999",
+      title: "Empty page",
+      body: { storage: { value: "<p>Just a description, no params.</p>" } }
+    });
+    const models = ConfluenceAdapter.parse(content, "page-999.json");
+    expect(models[0].documentedParams).toEqual([]);
+    expect(models[0].documentedReturnType).toBeUndefined();
+  });
+
   it("parses a page export without resolving symbolId", () => {
     const content = fixture("confluence", "page-123456.json");
     const models = ConfluenceAdapter.parse(content, "page-123456.json");

@@ -60,6 +60,13 @@ describe("parsePython", () => {
     const symbols = parsePython(content, "src/greeter.py");
     expect(symbols[0].params).toEqual([{ name: "name", type: "str", optional: false }]);
   });
+
+  it("matches 'async def' functions (regression: previously only matched plain 'def')", () => {
+    const content = `async def fetch(url: str) -> str:\n    return await get(url)\n`;
+    const symbols = parsePython(content, "src/fetcher.py");
+    expect(symbols).toHaveLength(1);
+    expect(symbols[0]).toMatchObject({ id: "src/fetcher.py#fetch", name: "fetch", returnType: "str" });
+  });
 });
 
 describe("diffFileSymbols", () => {

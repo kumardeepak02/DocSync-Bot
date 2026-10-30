@@ -1,4 +1,5 @@
-import { JSDoc, Project } from "ts-morph";
+import { Project } from "ts-morph";
+import { forEachTsFunctionLike } from "../diff/languageParsers";
 import { DocAdapter, DocModel, ParamModel } from "../types";
 
 const JS_PARAM_TAG_RE = /@param\s+(?:\{([^}]+)\}\s*)?(\S+)(?:\s+-?\s*(.*))?/g;
@@ -20,14 +21,16 @@ function parseJsDocParams(fullDocText: string): ParamModel[] {
 /**
  * Builds DocModel entries from the JSDoc comments already attached to TypeScript/JavaScript
  * functions and class methods. This is the "documentation as currently written" view, as opposed
- * to `languageParsers.ts` which extracts the actual code signature for diffing.
+ * to `languageParsers.ts` which extracts the actual code signature for diffing. Reuses
+ * `forEachTsFunctionLike` so the function/method traversal logic lives in exactly one place.
  */
 function parseTsDocModels(content: string, filePath: string): DocModel[] {
   const project = new Project({ useInMemoryFileSystem: true });
   const sourceFile = project.createSourceFile(filePath, content, { overwrite: true });
   const models: DocModel[] = [];
 
-  const handle = (name: string, docs: JSDoc[]) => {
+  forEachTsFunctionLike(sourceFile, (id, name, node) => {
+    const docs = node.getJsDocs();
     if (docs.length === 0) return;
     const lastDoc = docs[docs.length - 1];
     const fullText = lastDoc.getFullText();
@@ -41,25 +44,14 @@ function parseTsDocModels(content: string, filePath: string): DocModel[] {
       description: lastDoc.getDescription().trim() || undefined,
       rawContent: fullText
     });
-  };
-
-  for (const fn of sourceFile.getFunctions()) {
-    const name = fn.getName();
-    if (name) handle(name, fn.getJsDocs());
-  }
-  for (const cls of sourceFile.getClasses()) {
-    const className = cls.getName() ?? "(anonymous)";
-    for (const method of cls.getMethods()) {
-      handle(`${className}.${method.getName()}`, method.getJsDocs());
-    }
-  }
+  });
 
   return models;
 }
 
 function parsePyDocModels(content: string, filePath: string): DocModel[] {
   const models: DocModel[] = [];
-  const defRe = /^def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)\s*(?:->\s*[^\s:]+)?\s*:\s*\n\s*("""|''')([\s\S]*?)\2/gm;
+  const defRe = /^(?:async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)\s*(?:->\s*[^\s:]+)?\s*:\s*\n\s*("""|''')([\s\S]*?)\2/gm;
   let match: RegExpExecArray | null;
   while ((match = defRe.exec(content)) !== null) {
     const [, name, , docBody] = match;

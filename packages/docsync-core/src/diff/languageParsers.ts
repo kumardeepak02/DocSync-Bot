@@ -16,6 +16,31 @@ function extractDocComment(node: JSDocableNode): string | undefined {
 }
 
 /**
+ * Walks every top-level function and class method in a source file, invoking `callback` with a
+ * stable `id` (`<filePath>#<name>` or `<filePath>#<Class>.<method>`) and the ts-morph node.
+ * Shared by `parseTypeScript` (code-signature extraction) and `docstringAdapter`
+ * (JSDoc-as-currently-written extraction) so the two don't maintain duplicate traversal logic.
+ */
+export function forEachTsFunctionLike(
+  sourceFile: SourceFile,
+  callback: (id: string, name: string, node: FunctionDeclaration | MethodDeclaration) => void
+): void {
+  for (const fn of sourceFile.getFunctions()) {
+    const name = fn.getName();
+    if (!name) continue;
+    callback(`${sourceFile.getFilePath()}#${name}`, name, fn);
+  }
+
+  for (const cls of sourceFile.getClasses()) {
+    const className = cls.getName() ?? "(anonymous)";
+    for (const method of cls.getMethods()) {
+      const name = `${className}.${method.getName()}`;
+      callback(`${sourceFile.getFilePath()}#${name}`, name, method);
+    }
+  }
+}
+
+/**
  * Parses a single TypeScript/JavaScript file's content into a list of exported top-level
  * functions and class methods. Intentionally scoped to the common cases needed for docstring
  * drift detection (full language coverage is a documented known limitation).
@@ -25,42 +50,23 @@ export function parseTypeScript(content: string, filePath: string): SymbolModel[
   const sourceFile: SourceFile = project.createSourceFile(filePath, content, { overwrite: true });
   const symbols: SymbolModel[] = [];
 
-  for (const fn of sourceFile.getFunctions()) {
-    const name = fn.getName();
-    if (!name) continue;
+  forEachTsFunctionLike(sourceFile, (id, name, node) => {
     symbols.push({
       id: `${filePath}#${name}`,
       name,
       filePath,
-      kind: "function",
-      params: extractParams(fn),
-      returnType: fn.getReturnTypeNode()?.getText(),
-      bodyText: fn.getBodyText() ?? "",
-      docComment: extractDocComment(fn)
+      kind: name.includes(".") ? "method" : "function",
+      params: extractParams(node),
+      returnType: node.getReturnTypeNode()?.getText(),
+      bodyText: node.getBodyText() ?? "",
+      docComment: extractDocComment(node)
     });
-  }
-
-  for (const cls of sourceFile.getClasses()) {
-    const className = cls.getName() ?? "(anonymous)";
-    for (const method of cls.getMethods()) {
-      const name = method.getName();
-      symbols.push({
-        id: `${filePath}#${className}.${name}`,
-        name: `${className}.${name}`,
-        filePath,
-        kind: "method",
-        params: extractParams(method),
-        returnType: method.getReturnTypeNode()?.getText(),
-        bodyText: method.getBodyText() ?? "",
-        docComment: extractDocComment(method)
-      });
-    }
-  }
+  });
 
   return symbols;
 }
 
-const PY_DEF_RE = /^def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*(?:->\s*([^\s:]+))?\s*:/gm;
+const PY_DEF_RE = /^(?:async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*(?:->\s*([^\s:]+))?\s*:/gm;
 
 /**
  * Regex-based extraction of Python top-level function signatures (known MVP limitation vs. a

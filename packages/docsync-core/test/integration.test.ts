@@ -79,4 +79,53 @@ describe("checkRepo (end-to-end)", () => {
 
     fs.rmSync(repoRoot, { recursive: true, force: true });
   });
+
+  it("does not crash when the repo contains a non-OpenAPI YAML file", async () => {
+    const repoRoot = await makeGitRepo();
+    const git = simpleGit(repoRoot);
+
+    // A plain CI config YAML file — not an OpenAPI document — should be skipped, not crash the scan.
+    fs.writeFileSync(path.join(repoRoot, "ci.yaml"), "steps:\n  - run: echo hi\n  bad indentation here\n");
+    fs.writeFileSync(path.join(repoRoot, "math.ts"), "export function add(a: number, b: number): number {\n  return a + b;\n}\n");
+    await git.add(["ci.yaml", "math.ts"]);
+    await git.commit("base");
+    const base = (await git.revparse(["HEAD"])).trim();
+
+    fs.writeFileSync(path.join(repoRoot, "math.ts"), "export function add(a: number, b: number, c: number): number {\n  return a + b + c;\n}\n");
+    await git.add(["math.ts"]);
+    await git.commit("head");
+    const head = (await git.revparse(["HEAD"])).trim();
+
+    await expect(checkRepo({ repoRoot, base, head })).resolves.toBeDefined();
+
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  });
+
+  it("degrades gracefully when the Confluence client fails", async () => {
+    const repoRoot = await makeGitRepo();
+    const git = simpleGit(repoRoot);
+
+    fs.writeFileSync(path.join(repoRoot, "math.ts"), "/**\n * Adds two numbers.\n * @param {number} a\n * @param {number} b\n */\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n");
+    await git.add(["math.ts"]);
+    await git.commit("base");
+    const base = (await git.revparse(["HEAD"])).trim();
+
+    fs.writeFileSync(
+      path.join(repoRoot, "docsync.config.json"),
+      JSON.stringify({ confluenceLinks: [{ symbolId: "math.ts#add", confluencePageId: "123" }] })
+    );
+    fs.writeFileSync(path.join(repoRoot, "math.ts"), "/**\n * Adds two numbers.\n * @param {number} a\n * @param {number} b\n */\nexport function add(a: number, b: number, c: number): number {\n  return a + b + c;\n}\n");
+    await git.add(["math.ts", "docsync.config.json"]);
+    await git.commit("head");
+    const head = (await git.revparse(["HEAD"])).trim();
+
+    const failingConfluenceClient = { fetchPage: jest.fn().mockRejectedValue(new Error("Confluence unreachable")) };
+
+    const result = await checkRepo({ repoRoot, base, head, confluenceClient: failingConfluenceClient });
+
+    expect(failingConfluenceClient.fetchPage).toHaveBeenCalledWith("123");
+    expect(result.findings.length).toBeGreaterThan(0); // still works via docstring adapter despite Confluence failure
+
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  });
 });
