@@ -2,6 +2,8 @@
  * Shared types/models used across the DocSync-Bot core engine.
  */
 
+import { ConfluenceClient } from "./confluence/confluenceClient";
+
 export type DocType = "docstring" | "markdown" | "openapi" | "confluence";
 
 export type Severity = "high" | "medium" | "low";
@@ -111,3 +113,27 @@ export const DEFAULT_CONFIG: DocSyncConfig = {
   blockingSeverity: "medium",
   confluenceLinks: []
 };
+
+export interface CheckOptions {
+  /** Absolute path to the repository root (used for config loading, git ops, and repo scanning). */
+  repoRoot: string;
+  /** Base git ref/sha to diff from. */
+  base: string;
+  /** Head git ref/sha to diff to. */
+  head: string;
+  /** Overrides the LLM provider; defaults to `resolveLLMProviderFromEnv()` (may be undefined). */
+  llmProvider?: LLMProvider;
+  /** Overrides the Confluence client; defaults to `resolveConfluenceClientFromEnv()` (may be undefined). */
+  confluenceClient?: ConfluenceClient;
+}
+
+export interface CheckResult {
+  config: DocSyncConfig;
+  changes: SymbolChange[];
+  findings: DriftFinding[];
+  suggestions: Suggestion[];
+  /** Whether a real LLM provider was used (false means suggestions are detection-only). */
+  usedLLM: boolean;
+  /** Whether findings exceed the configured blocking severity threshold (FR-18). */
+  blocking: boolean;
+}

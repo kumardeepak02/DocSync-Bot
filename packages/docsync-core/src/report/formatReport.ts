@@ -1,8 +1,12 @@
-import { CheckResult } from "docsync-core";
+import { CheckResult } from "../types";
 
 const SEVERITY_EMOJI: Record<string, string> = { high: "🔴", medium: "🟠", low: "⚪" };
 
-/** Renders a `CheckResult` as the Markdown PR-comment body (FR-15). */
+/**
+ * Renders a `CheckResult` as a Markdown report (FR-15). Shared by both front doors —
+ * `docsync-cli` posts it as a PR comment and the VS Code extension renders it in a webview — so
+ * the two surfaces never diverge on what a finding/suggestion looks like.
+ */
 export function formatReport(result: CheckResult): string {
   if (result.findings.length === 0) {
     return "✅ **DocSync-Bot**: no documentation drift detected for this change.";

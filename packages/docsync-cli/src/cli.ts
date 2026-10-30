@@ -1,7 +1,6 @@
 import { Command } from "commander";
 import * as path from "path";
-import { checkRepo } from "docsync-core";
-import { formatReport } from "./formatter";
+import { checkRepo, formatReport } from "docsync-core";
 
 export interface CliIO {
   stdout: (msg: string) => void;

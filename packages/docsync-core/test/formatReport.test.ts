@@ -1,5 +1,5 @@
-import { formatReport } from "../src/formatter";
-import { CheckResult, DEFAULT_CONFIG } from "docsync-core";
+import { formatReport } from "../src/report/formatReport";
+import { CheckResult, DEFAULT_CONFIG } from "../src/types";
 
 function makeResult(overrides: Partial<CheckResult> = {}): CheckResult {
   return {

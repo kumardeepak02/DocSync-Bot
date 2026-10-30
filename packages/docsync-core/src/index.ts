@@ -1,5 +1,5 @@
 import { DocstringAdapter, MarkdownAdapter, OpenApiAdapter, ConfluenceAdapter } from "./adapters";
-import { ConfluenceClient, resolveConfluenceClientFromEnv } from "./confluence/confluenceClient";
+import { resolveConfluenceClientFromEnv } from "./confluence/confluenceClient";
 import { diffSymbols } from "./diff/diffAnalyzer";
 import { GitDiffSource } from "./diff/gitSource";
 import { scanRepoDocs } from "./discovery/repoScanner";
@@ -9,31 +9,7 @@ import { loadConfig } from "./link/config";
 import { groupDocsBySymbol, resolveLinks } from "./link/linkResolver";
 import { resolveLLMProviderFromEnv } from "./llm/githubModelsProvider";
 import { generateSuggestions } from "./suggestion/suggestionEngine";
-import { DocModel, DocSyncConfig, DriftFinding, LLMProvider, Suggestion, SymbolChange } from "./types";
-
-export interface CheckOptions {
-  /** Absolute path to the repository root (used for config loading, git ops, and repo scanning). */
-  repoRoot: string;
-  /** Base git ref/sha to diff from. */
-  base: string;
-  /** Head git ref/sha to diff to. */
-  head: string;
-  /** Overrides the LLM provider; defaults to `resolveLLMProviderFromEnv()` (may be undefined). */
-  llmProvider?: LLMProvider;
-  /** Overrides the Confluence client; defaults to `resolveConfluenceClientFromEnv()` (may be undefined). */
-  confluenceClient?: ConfluenceClient;
-}
-
-export interface CheckResult {
-  config: DocSyncConfig;
-  changes: SymbolChange[];
-  findings: DriftFinding[];
-  suggestions: Suggestion[];
-  /** Whether a real LLM provider was used (false means suggestions are detection-only). */
-  usedLLM: boolean;
-  /** Whether findings exceed the configured blocking severity threshold (FR-18). */
-  blocking: boolean;
-}
+import { CheckOptions, CheckResult, DocModel, DocSyncConfig } from "./types";
 
 async function collectDocs(
   options: CheckOptions,
@@ -127,3 +103,4 @@ export { redactSecrets } from "./util/redactSecrets";
 export { scanRepoDocs } from "./discovery/repoScanner";
 export { resolveConfluenceClientFromEnv, RestConfluenceClient } from "./confluence/confluenceClient";
 export type { ConfluenceClient } from "./confluence/confluenceClient";
+export { formatReport } from "./report/formatReport";
