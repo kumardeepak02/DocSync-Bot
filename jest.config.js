@@ -12,6 +12,7 @@ module.exports = {
   },
   collectCoverageFrom: [
     "packages/*/src/**/*.ts",
-    "!packages/docsync-vscode-extension/src/**"
+    "!packages/docsync-vscode-extension/src/**",
+    "!packages/docsync-cli/src/index.ts"
   ]
 };

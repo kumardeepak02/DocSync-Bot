@@ -40,6 +40,18 @@ describe("detectDrift", () => {
     expect(findings[0].reason).toMatch(/no longer match the code's parameters/);
   });
 
+  it("does not flag param drift when the doc never itemized params (prose-only JSDoc) — regression from dogfooding", () => {
+    const change: SymbolChange = {
+      symbolId: "src/math.ts#add",
+      changeType: "modified",
+      base: makeSymbol(),
+      head: makeSymbol({ params: [{ name: "a", type: "number" }, { name: "b", type: "number" }, { name: "c", type: "number" }] })
+    };
+    const docWithNoItemizedParams = makeDoc({ documentedParams: [], documentedReturnType: undefined });
+    const findings = detectDrift([change], new Map([["src/math.ts#add", [docWithNoItemizedParams]]]));
+    expect(findings).toHaveLength(0);
+  });
+
   it("flags high severity when the documented return type no longer matches", () => {
     const change: SymbolChange = {
       symbolId: "src/math.ts#add",

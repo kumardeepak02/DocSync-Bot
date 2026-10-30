@@ -2,6 +2,11 @@ import { bodyLineDeltaRatio } from "../diff/diffAnalyzer";
 import { DocModel, DriftFinding, ParamModel, SymbolChange } from "../types";
 
 function paramsMatch(documented: ParamModel[], actual: ParamModel[]): boolean {
+  // An empty documented-params list means the author never itemized parameters (e.g. a
+  // prose-only JSDoc comment with no @param tags) — that's a valid authoring style, not drift, so
+  // there is nothing to compare against. Only an itemized list that stops matching the code is
+  // treated as drift. (Found via dogfooding this tool against its own codebase — see Step 7.)
+  if (documented.length === 0) return true;
   if (documented.length !== actual.length) return false;
   return documented.every((p, i) => p.name === actual[i].name);
 }
