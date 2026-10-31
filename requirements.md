@@ -192,3 +192,53 @@ understand costs in a familiar currency.
 - Historical/offline exchange-rate caching beyond what FR-37's fallback requires.
 - Localization of filter labels/currency names beyond English (consistent with section 4's i18n
   exclusion).
+
+---
+
+## 6. EPMCDMETST-52508 — [BE] Document Intake and Validation for Multiple Document Formats
+
+> **Note**: This ticket describes a document-intake feature, separate from DocSync-Bot's
+> documentation-drift tooling and the travel-booking feature in section 5. It is captured here per
+> explicit request as a separate product context.
+
+**User Story**: As a system administrator, I want the system to validate and accept supported
+document formats for processing so that valid documents enter the processing pipeline and invalid
+files are rejected with appropriate errors.
+
+### 6.1 Functional Requirements (FR)
+- **FR-38**: Accept document uploads through both the batch upload interface and the API.
+- **FR-39**: Support PDF files through PDF 2.0, Microsoft Word DOC and DOCX files, Rich Text Format
+  (RTF) files, and Microsoft Excel XLS and XLSX files.
+- **FR-40**: Detect document format from file signatures and validate that the detected format matches
+  the file extension; reject uploads when they do not match.
+- **FR-41**: Validate format-specific structure and integrity before accepting a document.
+- **FR-42**: Accept files up to and including 100 MiB; reject larger files with a descriptive error.
+- **FR-43**: Detect encrypted or password-protected documents and prompt for a password or provide
+  appropriate password-required handling when needed.
+- **FR-44**: Generate a unique DocumentID for each successfully accepted document.
+- **FR-45**: Calculate and store an MD5 hash for document integrity verification.
+- **FR-46**: Extract and store the filename, file size, upload date, and detected document format.
+- **FR-47**: Store each accepted original file and persist its storage path/reference and DocumentFormat
+  in the document record.
+- **FR-48**: Return a success confirmation containing the DocumentID for accepted documents and
+  descriptive errors for validation failures.
+
+### 6.2 Non-Functional Requirements (NFR)
+- **NFR-26**: After a file of up to 100 MiB has been received, validation, hashing, metadata
+  extraction, and persistence must complete within 30 seconds under the expected deployment
+  configuration.
+- **NFR-27**: Sanitize and validate uploaded input to prevent injection attacks.
+- **NFR-28**: Passwords supplied for protected documents must be transmitted over TLS and must not be
+  stored or logged.
+
+### 6.3 Assumptions & Constraints
+- The relational database and file storage are configured, accessible, and have sufficient capacity;
+  required document-parsing libraries are installed.
+- The upload paths include both the batch upload interface and API, as clarified by the requester.
+- The maximum accepted file size is 100 MiB, as clarified by the requester.
+- Extension/signature mismatches are rejected, as clarified by the requester.
+- The ticket does not specify which protected document formats support password entry or the exact
+  password submission/prompt flow.
+
+### 6.4 Out of Scope (this ticket)
+- No additional out-of-scope items are specified in the ticket.
