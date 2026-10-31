@@ -136,3 +136,59 @@ is used for generation, with a deterministic mock provider used in automated tes
 - Fully autonomous merging of doc changes without human review.
 - Real-time (pre-commit, keystroke-level) doc sync — v1 is PR-level and on-demand only.
 - Generating documentation for undocumented legacy code with no existing doc anchor ("doc bootstrap").
+
+---
+
+## 5. EPMCDMETST-47868 — Stays: Advanced Filters & Currency Viewing Options
+
+> **Note**: This ticket describes a travel-booking "Stays" search feature, a different product domain
+> from DocSync-Bot's documentation-drift tooling (sections 1–4 above). It is captured here per explicit
+> request; treat as a separate feature/product context within this document.
+
+**User Story**: As a traveler searching for stays, I want to apply advanced stay filters and view all
+prices in my preferred currency, so that I can quickly find relevant accommodation options and
+understand costs in a familiar currency.
+
+### 5.1 Functional Requirements (FR)
+- **FR-27**: Provide an "Advanced filters" panel on the Stays search results page, additive to the
+  existing basic filters.
+- **FR-28**: Support advanced filter criteria: cancellation policy (free cancellation), meal plan, guest
+  rating, distance, property type, amenities, and payment options.
+- **FR-29**: Applying one or more advanced filters updates the results list to match the selected
+  criteria and displays each applied filter as a visible active selection (e.g., chip/tag).
+- **FR-30**: Provide a "Clear"/"Reset filters" action that returns all advanced filters to their default
+  (unselected) state and refreshes the results list accordingly.
+- **FR-31**: Provide a currency selector on the Stays search results page offering ISO-based currency
+  codes (e.g., USD/840, EUR/978, GBP/826, AED/784, JPY/392) from a supported currency list.
+- **FR-32**: Display currency options using the currency code only (e.g., "USD") in the selector UI.
+- **FR-33**: On selecting a currency, convert and display all stay prices on the results page in the
+  selected currency.
+- **FR-34**: Persist the selected currency when navigating from the search results page to an
+  individual stay's details page within the same session.
+- **FR-35**: Default the displayed currency based on the user's device/browser locale when no explicit
+  selection has been made.
+- **FR-36**: Retrieve currency conversion rates from a real-time external exchange-rate API/provider.
+- **FR-37**: When a conversion rate is unavailable for the selected currency, fall back to displaying
+  prices in the original/base currency and show a notice explaining the fallback.
+
+### 5.2 Non-Functional Requirements (NFR)
+- **NFR-23**: Currency conversion rate lookups must not block the results page from rendering; fetch
+  asynchronously/with caching, applying the FR-37 fallback if the external rate API is slow or
+  unavailable (reliability).
+- **NFR-24**: External exchange-rate API calls must use TLS, and rate-provider credentials/keys must
+  never be exposed in client-side code (security).
+- **NFR-25**: The supported currency list (ISO codes + numeric codes) must be centrally
+  configurable/extensible so new currencies can be added without code changes (maintainability).
+
+### 5.3 Assumptions & Constraints
+- Currency selection affects display only; it does not change the actual payment/booking currency used
+  at checkout.
+- All seven advanced filter categories listed in FR-28 are confirmed in scope for this story.
+- Manual currency selection, once made by the user, always overrides the device/browser locale default
+  (FR-35) for the remainder of the session.
+
+### 5.4 Out of Scope (this ticket)
+- Multi-currency checkout/payment processing (display-only conversion, per 5.3).
+- Historical/offline exchange-rate caching beyond what FR-37's fallback requires.
+- Localization of filter labels/currency names beyond English (consistent with section 4's i18n
+  exclusion).
