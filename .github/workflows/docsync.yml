@@ -1,0 +1,66 @@
+name: DocSync-Bot Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  docsync-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build workspace packages
+        run: npm run build --workspace=docsync-core --workspace=docsync-cli
+
+      - name: Run DocSync-Bot check
+        id: docsync
+        # GITHUB_MODELS_TOKEN is optional: if unset, SuggestionEngine falls back to
+        # detection-only mode (NFR-4) and the job still runs to completion.
+        env:
+          GITHUB_MODELS_TOKEN: ${{ secrets.GITHUB_MODELS_TOKEN }}
+        run: |
+          node packages/docsync-cli/dist/index.js check \
+            --base origin/${{ github.event.pull_request.base.ref }} \
+            --head ${{ github.event.pull_request.head.sha }} \
+            --repo "$GITHUB_WORKSPACE" | tee docsync-report.md
+          exit_code=${PIPESTATUS[0]}
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Post PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = fs.existsSync('docsync-report.md') ? fs.readFileSync('docsync-report.md', 'utf-8').trim() : '';
+            if (!body) {
+              body = '⚠️ **DocSync-Bot**: the check step produced no output (it may have errored before generating a report). Check the workflow logs for details.';
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+      - name: Fail job if blocking drift was found
+        if: steps.docsync.outputs.exit_code == '1'
+        run: exit 1

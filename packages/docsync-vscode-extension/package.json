@@ -1,0 +1,27 @@
+{
+  "name": "docsync-vscode-extension",
+  "version": "0.1.0",
+  "description": "VS Code extension front door for DocSync-Bot (thin: calls docsync-core in-process)",
+  "main": "dist/extension.js",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "docsync.checkCurrentBranch",
+        "title": "DocSync: Check Current Branch"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "docsync-core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0"
+  }
+}

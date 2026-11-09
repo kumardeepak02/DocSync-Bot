@@ -1,0 +1,16 @@
+{
+  "name": "docsync-core",
+  "version": "0.1.0",
+  "description": "Core detection, linking, drift-analysis, and AI-suggestion engine for DocSync-Bot",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@apidevtools/swagger-parser": "^10.1.1",
+    "simple-git": "^4.0.2",
+    "ts-morph": "^24.0.0",
+    "yaml": "^2.6.1"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "docsync-cli",
+  "version": "0.1.0",
+  "description": "CLI front door for DocSync-Bot, used by the GitHub Action PR-check path",
+  "main": "dist/index.js",
+  "bin": {
+    "docsync-cli": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "docsync-core": "^0.1.0"
+  }
+}
