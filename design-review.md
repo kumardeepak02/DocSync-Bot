@@ -70,3 +70,148 @@ Reviewer role: senior engineer reviewing `architecture.md` before implementation
 
 ## 4. Sign-off
 Design accepted for implementation planning (Step 4) with the above resolutions incorporated.
+
+## EPMCDMETST-47868
+
+### Review metadata and assessment
+
+- Review date: 2026-11-07 (decision update to the current EPMCDMETST-47868 review; this replaces
+  the prior ticket review).
+- Reviewer: GitHub Copilot, senior system design reviewer.
+- Architecture: [ticket section 9](architecture.md#9-epmcdmetst-47868--stays-advanced-filters--currency-viewing-options),
+  sections 9.1-9.10, including the agreed separate conversion request through the existing API.
+- Requirements: [ticket section 5](requirements.md#5-epmcdmetst-47868--stays-advanced-filters--currency-viewing-options),
+  FR-27 through FR-37 and NFR-23 through NFR-25.
+- Confluence reference in architecture: [High-level diagram for EPMCDMETST-47868](https://decentdkdeepak.atlassian.net/wiki/spaces/Epam/pages/18644993).
+  Confluence was not accessed during this local-only re-review; prior verification is historical,
+  not a current synchronization or rendering check.
+- Scope: traceability, component/interface/data ownership, flows, failures/consistency, security,
+  performance/scalability, external integration, testability, operations and rollout. The
+  separate DocSync-Bot architecture and its preceding review are out of scope.
+- Assessment: the architecture describes the required filter and display-currency capabilities
+  and captures the decisions confirmed on 2026-11-07. The response-correlation contract and
+  provider-policy proposal have now been approved for planning, along with rate validation/rounding.
+  Provider suitability checks remain a pre-integration verification gate, not an unresolved
+  architecture choice. Findings are design risks, not verified runtime defects.
+
+### Findings
+
+#### DR-47868-01 - High (Resolved) - Asynchronous response correlation and ordering unspecified
+
+- Confidence: High.
+- Evidence: architecture 9.2, 9.5 and 9.7 define separate conversion requests through the existing
+  API. Before this decision update, the contract did not specify response correlation. Relevant
+  requirements: FR-29, FR-33, FR-34; NFR-23.
+- Impact: an older response could replace prices for a newer filter or currency choice; the
+  architecture diagram did not previously define an implementable interface contract.
+- Recommendation: include search and currency-selection revisions plus requested currency, echo
+  them in responses, discard obsolete responses, and test rapid selection changes and out-of-order
+  completion. Keep provider credentials server-side. Transport is separate requests through the
+  existing API.
+- Status: Resolved. The user approved that correlation contract on 2026-11-07. The client applies a
+  response only when search revision, currency-selection revision, and currency still match the
+  active selection; obsolete responses are discarded. API and client behavior must be tested.
+
+#### DR-47868-02 - Medium (Resolved; verification gate remains) - Rate validity, freshness and failure policy unspecified
+
+- Confidence: High.
+- Evidence: architecture 9.2 and 9.4 recommend a provider integration; before this update, the
+  architecture did not have approved validity, age, timeout, or retry criteria. Requirements FR-36
+  calls for a real-time provider; FR-37 requires original/base fallback
+  when the selected rate is unavailable; NFR-23 allows asynchronous lookup/caching; section 5.4
+  excludes historical/offline rate caching beyond fallback needs.
+- Impact: a stale or malformed rate may be treated as usable, unbounded provider calls may linger,
+  or caching may exceed the explicit scope boundary.
+- Recommendation: verify provider cadence, pair support and terms before integration; enforce
+  finite-positive/fresh-rate validation, bounded timeout/retry, decimal conversion and currency
+  minor-unit rounding for heterogeneous base currencies. Do not retain historical/offline rates;
+  use FR-37 fallback for unusable rates. Test missing/malformed rates, expiry, provider timeout/rate
+  limits and mixed base currencies.
+- Status: Resolved for planning by user approval on 2026-11-07: Open Exchange Rates latest-rates API
+  candidate; maximum rate age 5 minutes; 2-second timeout per attempt; at most one retry for
+  transient network/429/5xx failures; and 5-second total deadline. Reject non-finite, non-positive,
+  future-dated, and expired rates. Use decimal arithmetic, ISO 4217 minor-unit precision, and
+  half-expand rounding for display; require a supported rate for every needed base/target pair.
+  Preserve original/base fallback and no historical/offline rate caching. Provider publication
+  cadence, pair coverage, plan limits, and terms were not independently verified here and are a
+  mandatory pre-integration gate; a failed check requires an approved provider decision.
+
+#### DR-47868-03 - Medium (Resolved) - Unsupported locale default was unspecified
+
+- Confidence: High.
+- Evidence: architecture 9.6 infers a default from device/browser locale and 9.9 acknowledges a
+  locale may not map to a supported currency, but no fallback is selected. Relevant requirements:
+  FR-31, FR-35; NFR-25; section 5.3 says an explicit manual choice overrides locale for the session.
+- Impact: absent, language-only or unsupported-region locales may produce inconsistent UI/service
+  defaults or no selected display currency.
+- Recommendation: centrally map supported locale regions and select an explicit fallback for
+  unmatched locales while preserving a manual session choice. Candidate policies are a configured
+  supported default or original/base display. Test absent, ambiguous and unsupported locales.
+- Status: Resolved. Use configured USD for absent, ambiguous or unsupported locale mappings;
+  manual session selection still overrides it (user, 2026-11-07).
+
+#### DR-47868-04 - Medium (Resolved) - Session contract was unspecified
+
+- Confidence: High.
+- Evidence: architecture 9.3/9.4 say the selection is session-scoped, but no storage/lifetime or
+  details resolution contract is defined. The sequence now includes original/base prices and a
+  notice if conversion is unavailable (9.7/9.10). Relevant requirements: FR-34, FR-37; NFR-23;
+  section 5.3.
+- Impact: results and details could diverge in selected currency or fallback handling, and clients
+  could interpret "same session" differently.
+- Recommendation: keep the selected currency independent of rate availability, specify session
+  scope/lifetime, and use the same conversion/fallback contract on details. Test navigation during
+  a rate outage and manual-selection precedence.
+- Status: Resolved. Use per-tab `sessionStorage` through same-tab results-to-details navigation,
+  expiring when that tab's session ends; details use the same conversion/fallback behavior
+  (user, 2026-11-07). The original/base fallback follows FR-34/FR-37.
+
+#### DR-47868-05 - Low (Resolved) - Operational and rollout verification was unspecified
+
+- Confidence: High for the documentation gap; operational impact is unmeasured.
+- Evidence: architecture 9.8 includes functional and provider-outage tests but no operational
+  signals, concurrency/load validation or rollout/rollback checks. Relevant requirements: FR-29,
+  FR-37; NFR-23 through NFR-25.
+- Impact: slow/outage provider behavior, frequent fallback, expensive filter queries, or invalid
+  configuration may be difficult to detect or safely roll back.
+- Recommendation: define sanitized latency/error/rate-response-age/fallback metrics, concurrency and
+  provider-outage tests, config compatibility checks, and staged rollout/rollback validation.
+  Confirm thresholds with operations; do not infer a new SLA.
+- Status: Resolved at the architecture-expectation level. Monitor rate lookup latency, provider
+  errors and fallback frequency; provider-outage/load testing and staged rollout with rollback are
+  approved (user, 2026-11-07). Define implementation-specific coverage and thresholds with owners.
+
+### Decision log
+
+| State | Decision | Basis / confirmer |
+|---|---|---|
+| Agreed | Reuse existing Stays/search services; server-side AND across categories and OR within; kilometer radius; minimum guest rating; advanced reset preserves basic filters; manual currency overrides locale within session; use standard minor units; reuse existing authentication/authorization. | User's earlier "accept defaults"; recorded in architecture 9.9. |
+| Requirement-derived clarification | Preserve currency choice separately from rate availability; details show original/base prices and an explanatory notice when conversion is unavailable. | FR-34/FR-37 and previously approved fallback behavior; architecture 9.7/9.10. |
+| Agreed | Converted prices are requested separately through the existing API; provider remains server-side. | User's response on 2026-11-07; architecture 9.5-9.7 updated. |
+| Agreed | No historical/offline rate caching beyond requirements section 5.4; expired or unavailable rates fall back to original/base prices with a notice. | User's response on 2026-11-07. |
+| Agreed | Use centrally configured USD for unsupported/ambiguous locale mappings; manual session selection takes precedence. | User's response on 2026-11-07; architecture 9.4/9.6/9.10 updated. |
+| Agreed | Store currency in per-tab `sessionStorage` through same-tab details navigation; clear when tab session ends. | User's response on 2026-11-07; architecture 9.3/9.4/9.10 updated. |
+| Agreed | Monitor rate latency/errors/fallback frequency; perform provider-outage/load testing and staged rollout with rollback. | User's response on 2026-11-07; implementation-specific coverage/thresholds remain tasks. |
+| Agreed for planning | Open Exchange Rates latest-rates API candidate, subject to pre-integration verification; max rate age 5 minutes; 2-second attempt timeout; at most one retry for transient network/429/5xx failures; 5-second overall deadline including retry delay. | User approval, 2026-11-07. Verify current cadence, pair coverage, plan limits and terms against FR-36 before integration; if any check fails, pause and seek approval for an alternative provider. |
+| Agreed for planning | Conversion request/response correlation uses search revision, currency-selection revision, and requested currency; responses echo these fields and obsolete responses are discarded. | User approval, 2026-11-07; test rapid changes and out-of-order completion. |
+| Agreed for planning | Reject non-finite, non-positive, future-dated, and over-5-minute-old rates; perform decimal conversion and round to ISO 4217 minor-unit precision using half-expand; validate every required base/target pair. | User approval, 2026-11-07; no historical/offline rate cache; original/base fallback and notice remain required. |
+| Approved | Architecture approved for implementation planning; this is not production-release sign-off. | User confirmation, 2026-11-07; provider suitability remains a pre-integration gate. |
+
+### Changes, verification, and follow-up
+
+- Updated architecture section 9 with the approved response-correlation, provider-policy,
+  rate-validation, and rounding decisions; retained the explicit provider due-diligence gate.
+  Recorded approval for implementation planning, not release. No production code or requirements
+  changed.
+- Replaced the prior EPMCDMETST-47868 review section with this current review; unrelated review
+  content is preserved.
+- Local review only: no current Confluence synchronization, page render, production API, provider,
+  load test or deployed security control was verified. The linked Confluence page and SVG are
+  references from prior work, not evidence of current external synchronization; visual rendering
+  was previously unverified.
+- Before provider integration, verify current provider update cadence, required pair coverage, plan
+  limits and terms. If any verification fails, obtain approval for an alternative provider before
+  proceeding. No vendor suitability check was performed as part of this local review.
+- Before release, validate timeout/retry and rate-validation boundaries, response ordering,
+  mixed-currency conversion/rounding, session navigation, configuration, concurrency/load, outage
+  behavior and rollback; confirm operational ownership and thresholds.

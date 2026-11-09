@@ -1,0 +1,1033 @@
+﻿=== JIRA Ticket: EPMCDMETST-52508 ===
+Summary:      [BE] Document Intake and Validation for Multiple Document Formats
+Status:       Open
+Priority:     Critical
+Type:         
+Assignee:     Unassigned
+Reporter:     Nisha Binoy
+Labels:       AI-Generated, AI/Run
+Created:      2026-06-30 11:18:08 India Standard Time
+Updated:      2026-09-30 23:22:00 India Standard Time
+URL:          https://jiraeu.epam.com/browse/EPMCDMETST-52508
+
+--- Description ---
+## Primary User Story
+As a system administrator, I want the system to validate and accept PDF, DOC, RTF, and XLS files for processing so that documents in multiple formats can enter the processing pipeline and invalid files are rejected with appropriate error messages.
+## Specification Reference
+Pages 1-2 (Document Ingestion and Batch Processing), Page 3 (Document Intake Module)
+## Description
+Implement the Document Intake Module that handles the receipt and validation of PDF, DOC, RTF, and XLS files for processing. The module will validate document format compatibility, file size constraints, and document integrity before accepting documents into the processing queue.
+## Requirements
+- Accept PDF files of any version up to PDF 2.0 (ISO-32000-2)
+- Accept DOC files (Microsoft Word .doc format)
+- Accept RTF files (Rich Text Format)
+- Accept XLS files (Microsoft Excel .xls format)
+- Accept DOCX files (Microsoft Word .docx format)
+- Accept XLSX files (Microsoft Excel .xlsx format)
+- Validate file format and structure integrity for each format type
+- Support document files up to 100MB in size
+- Generate unique document identifiers (DocumentID) for each uploaded file
+- Calculate MD5 hash for document integrity verification
+- Validate file metadata and extract basic information (filename, size, upload date, format type)
+- Store original files with appropriate file path references
+- Handle encrypted/password-protected documents and prompt for passwords when needed
+- Sanitize all inputs to prevent injection attacks
+- Provide detailed error messages for validation failures
+- Detect document format automatically based on file signature (magic bytes), not just extension
+## Preconditions
+- Relational database is configured and accessible
+- File storage system is available with appropriate permissions
+- System has sufficient storage capacity
+- Document processing libraries are installed (PyPDF2/PyMuPDF for PDF, python-docx for DOC/DOCX, pyrtf for RTF, openpyxl/xlrd for XLS/XLSX)
+## Scenarios of Use
+1. Administrator uploads a valid document file (PDF, DOC, RTF, or XLS) through the batch upload interface
+1. System detects document format using file signature validation
+1. System validates format-specific structure and version compatibility
+1. System checks file size against maximum limit (100MB)
+1. System generates unique DocumentID and calculates MD5 hash
+1. System stores DocumentFormat field (PDF, DOC, RTF, XLS, DOCX, XLSX)
+1. System stores file in designated storage location
+1. System creates database record with document information including format
+1. System returns success confirmation with DocumentID
+## Affected Areas
+- Document Intake Module
+- Database Management Module (Documents table - add DocumentFormat field)
+- File storage system
+- API Layer
+- Format detection services
+- Document parsing library dependencies
+## Acceptance Criteria
+- PDF files up to version 2.0 are successfully validated and accepted
+- DOC/DOCX files (Microsoft Word) are successfully validated and accepted
+- RTF files are successfully validated and accepted
+- XLS/XLSX files (Microsoft Excel) are successfully validated and accepted
+- Files exceeding 100MB are rejected with appropriate error message
+- Each document receives a unique DocumentID upon successful validation
+- Document format is correctly identified and stored in DocumentFormat field
+- MD5 hash is calculated and stored for integrity verification
+- Invalid or corrupted files (any format) are rejected with descriptive error messages
+- Encrypted/password-protected documents trigger password prompt or appropriate handling
+- All file metadata (filename, size, upload date, format) is correctly extracted and stored
+- Original files are stored with correct file path references in the database
+- Format detection works based on file signature, not just extension (prevents spoofing)
+----
+## Test Cases
+### TC-001 — Verify successful intake/validation and persistence for all supported document formats
+\*\*Objective\*\*
+Ensure supported formats are accepted end-to-end: signature-based detection, integrity validation, size check, DocumentID generation, metadata  MD5  format + file path persistence, and success response.
+\*\*Acceptance Criteria\*\*
+AC1, AC2, AC3, AC4, AC6, AC7, AC8, AC11, AC12, AC13
+\*\*Preconditions\*\*
+1. Document Intake Module deployed and reachable (batch upload interface or API endpoint available).
+1. Relational DB accessible and “Documents” table includes DocumentFormat field.
+1. File storage system accessible with required permissions.
+1. Ability to retrieve stored document record by DocumentID (via API/admin UI/DB query) is available to QA.
+\*\*Test Data (Supported format matrix — run same flow once per row)\*\*
+| Format | File | Constraints |
+|---|---|---|
+| PDF | valid\*pdf\*17.pdf | PDF v1.7; size < 100MB |
+| PDF | valid\*pdf\*20.pdf | PDF v2.0; size < 100MB |
+| DOC | valid\_doc.doc | valid; size < 100MB |
+| DOCX | valid\_docx.docx | valid; size < 100MB |
+| RTF | valid\_rtf.rtf | valid; size < 100MB |
+| XLS | valid\_xls.xls | valid; size < 100MB |
+| XLSX | valid\_xlsx.xlsx | valid; size < 100MB |
+\*\*Steps\*\*
+| Step | Action | Expected Result |
+|---|---|---|
+| 1 | Open the Document Intake batch upload interface (or prepare an upload request via the supported API). | Upload capability is available and ready to accept a file input. |
+| 2 | Select the test file for the current matrix row and initiate upload/validation. | System accepts submission and begins validation (no immediate unsupported-format error). |
+| 3 | Wait for validation to complete and capture returned DocumentID from the success response/confirmation. | Success confirmation returned and DocumentID present and non-empty. |
+| 4 | Repeat Steps 1–3 for each file in the supported format matrix; collect all DocumentIDs. | Each upload is successful and each DocumentID is unique across all successful uploads. |
+| 5 | For each DocumentID, retrieve the corresponding document record (via API/admin UI/DB query). | Exactly one record exists per DocumentID. |
+| 6 | Validate persisted metadata fields for each record: filename, size, upload date, and format/DocumentFormat. | Stored values match the uploaded file and DocumentFormat matches actual file type. |
+| 7 | Validate MD5 persistence: compare stored MD5 to locally computed MD5 of uploaded file bytes. | Stored MD5 present and equals locally computed MD5. |
+| 8 | Validate storage persistence: verify record contains file path/reference and confirm original file exists at that location (or is retrievable using that reference). | File path/reference present and stored file accessible and corresponds to uploaded content. |
+\*\*Overall Expected Result\*\*
+All supported formats are accepted; unique DocumentIDs are generated; metadata, DocumentFormat, MD5, and file path are persisted correctly and the stored files are retrievable.
+\*\*Priority:\*\* High
+\*\*Type:\*\* E2E / Integration / Persistence
+### TC-002 — Verify rejection for oversize and corrupted/invalid files with descriptive errors
+\*\*Objective\*\*
+Ensure validation failures are handled: oversize >100MB and invalid/corrupted structure are rejected with descriptive error messages and no successful persistence.
+\*\*Acceptance Criteria\*\*
+AC5, AC9
+\*\*Preconditions\*\*
+1. Same as TC-001.
+1. Ability to verify no record created by searching DB/API using filename/time window (since no DocumentID should be issued).
+\*\*Test Data (Negative matrix — run once per row)\*\*
+| Scenario | File | Notes |
+|---|---|---|
+| Oversize | oversize\*valid\*pdf.pdf (or oversize\*valid\*doc.docx) | Any supported format; size > 100MB |
+| Corrupted PDF | corrupt.pdf | size < 100MB; invalid/broken structure |
+| Corrupted DOC/DOCX | corrupt.docx | size < 100MB; unopenable/invalid package |
+| Corrupted XLS/XLSX | corrupt.xlsx | size < 100MB; unopenable/invalid workbook |
+| Corrupted RTF | corrupt.rtf | size < 100MB; invalid header/structure |
+\*\*Steps\*\*
+| Step | Action | Expected Result |
+|---|---|---|
+| 1 | Open the Document Intake upload interface (or prepare API request). | Upload capability is available. |
+| 2 | Upload Negative matrix row A (>100MB). | Validation fails; upload rejected with error indicating file exceeds maximum size (100MB); no success confirmation. |
+| 3 | Verify system does not return a DocumentID for row A. | No DocumentID issued. |
+| 4 | Verify persistence did not occur for row A (search by filename and upload timestamp window in DB/API/logged intake results). | No document record/file created for rejected upload (or any partial artifacts are not present/are rolled back), per observable system behavior. |
+| 5 | Repeat Steps 1–4 for each corrupted/invalid file row (B–E). | Each is rejected with descriptive error indicating invalid/corrupted content/structure; no DocumentID issued; no persisted document record/file created. |
+\*\*Overall Expected Result\*\*
+Invalid uploads are rejected with descriptive errors; no DocumentID is issued; no document records/files are persisted.
+\*\*Priority:\*\* High
+\*\*Type:\*\* Negative / Validation / Integration
+### TC-003 — Verify signature-based format detection blocks extension spoofing
+\*\*Objective\*\*
+Ensure format detection is based on file signature (magic bytes) not file extension; spoofed files are rejected (or handled as their true type) with appropriate error behavior.
+\*\*Acceptance Criteria\*\*
+AC7, AC13
+\*\*Preconditions\*\*
+1. Same as TC-001.
+1. Ability to observe system-reported detected format (error detail or stored DocumentFormat if accepted).
+\*\*Test Data (Spoofing matrix)\*\*
+| Case | File | Actual content | Extension |
+|---|---|---|---|
+| 1 | pdf\*renamed\*as\_docx.docx | PDF | .docx |
+| 2 | docx\*renamed\*as\_pdf.pdf | DOCX | .pdf |
+| 3 | xlsx\*renamed\*as\_rtf.rtf | XLSX | .rtf |
+\*\*Steps\*\*
+| Step | Action | Expected Result |
+|---|---|---|
+| 1 | Open the Document Intake upload interface (or prepare API request). | Upload capability is available. |
+| 2 | Upload spoofing file #1. | System detects true format based on signature (PDF) rather than trusting extension; outcome consistent with that detection (accept as PDF or reject if mismatch policy exists—not specified). |
+| 3 | If accepted, capture DocumentID and retrieve stored record. | DocumentFormat reflects true detected format, not spoofed extension. |
+| 4 | If rejected, verify error message is descriptive and indicates a format/signature mismatch or unsupported/invalid content based on detection. | Descriptive validation error; no DocumentID. |
+| 5 | Repeat Steps 2–4 for spoofing files #2 and #3. | Signature-based detection for each; stored DocumentFormat (if accepted) matches actual content; rejected cases provide descriptive errors and no persistence. |
+\*\*Overall Expected Result\*\*
+Signature-based detection is enforced; extension spoofing does not bypass validation; system either accepts as the true type or rejects with descriptive errors (policy-dependent).
+\*\*Priority:\*\* High
+\*\*Type:\*\* Security / Negative / Validation
+### TC-004 — Verify handling of encrypted/password-protected documents
+\*\*Objective\*\*
+Ensure encrypted/password-protected documents trigger a password prompt or appropriate handling, and that successful password entry (if supported) allows intake; incorrect/missing password prevents intake.
+\*\*Acceptance Criteria\*\*
+AC10
+\*\*Preconditions\*\*
+1. Same as TC-001.
+1. Ability to respond to a password prompt if UI exists (or provide password via API if supported).
+\*\*Test Data\*\*
+| Case | File | Password |
+|---|---|---|
+| Wrong password | protected.pdf |  |
+| Correct password | protected.pdf |  |
+| Optional (if supported) | protected.docx |  |
+\*\*Steps\*\*
+| Step | Action | Expected Result |
+|---|---|---|
+| 1 | Open the Document Intake upload interface (or prepare API request). | Upload capability is available. |
+| 2 | Upload protected.pdf. | System detects encryption and triggers password prompt or explicit password-required handling response (exact mechanism not specified). |
+| 3 | Provide  when prompted (or submit without password if supported). | Validation fails; descriptive error; no DocumentID; no persistence. |
+| 4 | Retry upload and provide . | Validation succeeds; success confirmation with non-empty DocumentID. |
+| 5 | Retrieve stored record by DocumentID and validate persisted fields (DocumentFormat, metadata, MD5, file path reference). | All required fields stored correctly; original file stored/retrievable, consistent with TC-001 validations. |
+| 6 | Repeat Steps 2–5 for protected.docx if password-protected Office formats are supported in scope. | Same behavior: password required; wrong/missing rejected; correct accepted with persistence. |
+\*\*Overall Expected Result\*\*
+Encrypted documents trigger password handling; wrong/missing password prevents intake; correct password allows successful intake with normal persistence.
+\*\*Priority:\*\* Medium
+\*\*Type:\*\* Alternate Flow / Security / Validation
+
+--- Full Raw Data (every field, for completeness) ---
+{
+    "id":  "14168970",
+    "key":  "EPMCDMETST-52508",
+    "summary":  "[BE] Document Intake and Validation for Multiple Document Formats",
+    "url":  "https://jiraeu.epam.com/rest/api/2/issue/14168970",
+    "browse_url":  "https://jiraeu.epam.com/browse/EPMCDMETST-52508",
+    "description":  "## Primary User Story\nAs a system administrator, I want the system to validate and accept PDF, DOC, RTF, and XLS files for processing so that documents in multiple formats can enter the processing pipeline and invalid files are rejected with appropriate error messages.\n## Specification Reference\nPages 1-2 (Document Ingestion and Batch Processing), Page 3 (Document Intake Module)\n## Description\nImplement the Document Intake Module that handles the receipt and validation of PDF, DOC, RTF, and XLS files for processing. The module will validate document format compatibility, file size constraints, and document integrity before accepting documents into the processing queue.\n## Requirements\n- Accept PDF files of any version up to PDF 2.0 (ISO-32000-2)\n- Accept DOC files (Microsoft Word .doc format)\n- Accept RTF files (Rich Text Format)\n- Accept XLS files (Microsoft Excel .xls format)\n- Accept DOCX files (Microsoft Word .docx format)\n- Accept XLSX files (Microsoft Excel .xlsx format)\n- Validate file format and structure integrity for each format type\n- Support document files up to 100MB in size\n- Generate unique document identifiers (DocumentID) for each uploaded file\n- Calculate MD5 hash for document integrity verification\n- Validate file metadata and extract basic information (filename, size, upload date, format type)\n- Store original files with appropriate file path references\n- Handle encrypted/password-protected documents and prompt for passwords when needed\n- Sanitize all inputs to prevent injection attacks\n- Provide detailed error messages for validation failures\n- Detect document format automatically based on file signature (magic bytes), not just extension\n## Preconditions\n- Relational database is configured and accessible\n- File storage system is available with appropriate permissions\n- System has sufficient storage capacity\n- Document processing libraries are installed (PyPDF2/PyMuPDF for PDF, python-docx for DOC/DOCX, pyrtf for RTF, openpyxl/xlrd for XLS/XLSX)\n## Scenarios of Use\n1. Administrator uploads a valid document file (PDF, DOC, RTF, or XLS) through the batch upload interface\n1. System detects document format using file signature validation\n1. System validates format-specific structure and version compatibility\n1. System checks file size against maximum limit (100MB)\n1. System generates unique DocumentID and calculates MD5 hash\n1. System stores DocumentFormat field (PDF, DOC, RTF, XLS, DOCX, XLSX)\n1. System stores file in designated storage location\n1. System creates database record with document information including format\n1. System returns success confirmation with DocumentID\n## Affected Areas\n- Document Intake Module\n- Database Management Module (Documents table - add DocumentFormat field)\n- File storage system\n- API Layer\n- Format detection services\n- Document parsing library dependencies\n## Acceptance Criteria\n- PDF files up to version 2.0 are successfully validated and accepted\n- DOC/DOCX files (Microsoft Word) are successfully validated and accepted\n- RTF files are successfully validated and accepted\n- XLS/XLSX files (Microsoft Excel) are successfully validated and accepted\n- Files exceeding 100MB are rejected with appropriate error message\n- Each document receives a unique DocumentID upon successful validation\n- Document format is correctly identified and stored in DocumentFormat field\n- MD5 hash is calculated and stored for integrity verification\n- Invalid or corrupted files (any format) are rejected with descriptive error messages\n- Encrypted/password-protected documents trigger password prompt or appropriate handling\n- All file metadata (filename, size, upload date, format) is correctly extracted and stored\n- Original files are stored with correct file path references in the database\n- Format detection works based on file signature, not just extension (prevents spoofing)\n----\n## Test Cases\n### TC-001 — Verify successful intake/validation and persistence for all supported document formats\n\\*\\*Objective\\*\\*\nEnsure supported formats are accepted end-to-end: signature-based detection, integrity validation, size check, DocumentID generation, metadata  MD5  format + file path persistence, and success response.\n\\*\\*Acceptance Criteria\\*\\*\nAC1, AC2, AC3, AC4, AC6, AC7, AC8, AC11, AC12, AC13\n\\*\\*Preconditions\\*\\*\n1. Document Intake Module deployed and reachable (batch upload interface or API endpoint available).\n1. Relational DB accessible and “Documents” table includes DocumentFormat field.\n1. File storage system accessible with required permissions.\n1. Ability to retrieve stored document record by DocumentID (via API/admin UI/DB query) is available to QA.\n\\*\\*Test Data (Supported format matrix — run same flow once per row)\\*\\*\n| Format | File | Constraints |\n|---|---|---|\n| PDF | valid\\*pdf\\*17.pdf | PDF v1.7; size \u003c 100MB |\n| PDF | valid\\*pdf\\*20.pdf | PDF v2.0; size \u003c 100MB |\n| DOC | valid\\_doc.doc | valid; size \u003c 100MB |\n| DOCX | valid\\_docx.docx | valid; size \u003c 100MB |\n| RTF | valid\\_rtf.rtf | valid; size \u003c 100MB |\n| XLS | valid\\_xls.xls | valid; size \u003c 100MB |\n| XLSX | valid\\_xlsx.xlsx | valid; size \u003c 100MB |\n\\*\\*Steps\\*\\*\n| Step | Action | Expected Result |\n|---|---|---|\n| 1 | Open the Document Intake batch upload interface (or prepare an upload request via the supported API). | Upload capability is available and ready to accept a file input. |\n| 2 | Select the test file for the current matrix row and initiate upload/validation. | System accepts submission and begins validation (no immediate unsupported-format error). |\n| 3 | Wait for validation to complete and capture returned DocumentID from the success response/confirmation. | Success confirmation returned and DocumentID present and non-empty. |\n| 4 | Repeat Steps 1–3 for each file in the supported format matrix; collect all DocumentIDs. | Each upload is successful and each DocumentID is unique across all successful uploads. |\n| 5 | For each DocumentID, retrieve the corresponding document record (via API/admin UI/DB query). | Exactly one record exists per DocumentID. |\n| 6 | Validate persisted metadata fields for each record: filename, size, upload date, and format/DocumentFormat. | Stored values match the uploaded file and DocumentFormat matches actual file type. |\n| 7 | Validate MD5 persistence: compare stored MD5 to locally computed MD5 of uploaded file bytes. | Stored MD5 present and equals locally computed MD5. |\n| 8 | Validate storage persistence: verify record contains file path/reference and confirm original file exists at that location (or is retrievable using that reference). | File path/reference present and stored file accessible and corresponds to uploaded content. |\n\\*\\*Overall Expected Result\\*\\*\nAll supported formats are accepted; unique DocumentIDs are generated; metadata, DocumentFormat, MD5, and file path are persisted correctly and the stored files are retrievable.\n\\*\\*Priority:\\*\\* High\n\\*\\*Type:\\*\\* E2E / Integration / Persistence\n### TC-002 — Verify rejection for oversize and corrupted/invalid files with descriptive errors\n\\*\\*Objective\\*\\*\nEnsure validation failures are handled: oversize \u003e100MB and invalid/corrupted structure are rejected with descriptive error messages and no successful persistence.\n\\*\\*Acceptance Criteria\\*\\*\nAC5, AC9\n\\*\\*Preconditions\\*\\*\n1. Same as TC-001.\n1. Ability to verify no record created by searching DB/API using filename/time window (since no DocumentID should be issued).\n\\*\\*Test Data (Negative matrix — run once per row)\\*\\*\n| Scenario | File | Notes |\n|---|---|---|\n| Oversize | oversize\\*valid\\*pdf.pdf (or oversize\\*valid\\*doc.docx) | Any supported format; size \u003e 100MB |\n| Corrupted PDF | corrupt.pdf | size \u003c 100MB; invalid/broken structure |\n| Corrupted DOC/DOCX | corrupt.docx | size \u003c 100MB; unopenable/invalid package |\n| Corrupted XLS/XLSX | corrupt.xlsx | size \u003c 100MB; unopenable/invalid workbook |\n| Corrupted RTF | corrupt.rtf | size \u003c 100MB; invalid header/structure |\n\\*\\*Steps\\*\\*\n| Step | Action | Expected Result |\n|---|---|---|\n| 1 | Open the Document Intake upload interface (or prepare API request). | Upload capability is available. |\n| 2 | Upload Negative matrix row A (\u003e100MB). | Validation fails; upload rejected with error indicating file exceeds maximum size (100MB); no success confirmation. |\n| 3 | Verify system does not return a DocumentID for row A. | No DocumentID issued. |\n| 4 | Verify persistence did not occur for row A (search by filename and upload timestamp window in DB/API/logged intake results). | No document record/file created for rejected upload (or any partial artifacts are not present/are rolled back), per observable system behavior. |\n| 5 | Repeat Steps 1–4 for each corrupted/invalid file row (B–E). | Each is rejected with descriptive error indicating invalid/corrupted content/structure; no DocumentID issued; no persisted document record/file created. |\n\\*\\*Overall Expected Result\\*\\*\nInvalid uploads are rejected with descriptive errors; no DocumentID is issued; no document records/files are persisted.\n\\*\\*Priority:\\*\\* High\n\\*\\*Type:\\*\\* Negative / Validation / Integration\n### TC-003 — Verify signature-based format detection blocks extension spoofing\n\\*\\*Objective\\*\\*\nEnsure format detection is based on file signature (magic bytes) not file extension; spoofed files are rejected (or handled as their true type) with appropriate error behavior.\n\\*\\*Acceptance Criteria\\*\\*\nAC7, AC13\n\\*\\*Preconditions\\*\\*\n1. Same as TC-001.\n1. Ability to observe system-reported detected format (error detail or stored DocumentFormat if accepted).\n\\*\\*Test Data (Spoofing matrix)\\*\\*\n| Case | File | Actual content | Extension |\n|---|---|---|---|\n| 1 | pdf\\*renamed\\*as\\_docx.docx | PDF | .docx |\n| 2 | docx\\*renamed\\*as\\_pdf.pdf | DOCX | .pdf |\n| 3 | xlsx\\*renamed\\*as\\_rtf.rtf | XLSX | .rtf |\n\\*\\*Steps\\*\\*\n| Step | Action | Expected Result |\n|---|---|---|\n| 1 | Open the Document Intake upload interface (or prepare API request). | Upload capability is available. |\n| 2 | Upload spoofing file #1. | System detects true format based on signature (PDF) rather than trusting extension; outcome consistent with that detection (accept as PDF or reject if mismatch policy exists—not specified). |\n| 3 | If accepted, capture DocumentID and retrieve stored record. | DocumentFormat reflects true detected format, not spoofed extension. |\n| 4 | If rejected, verify error message is descriptive and indicates a format/signature mismatch or unsupported/invalid content based on detection. | Descriptive validation error; no DocumentID. |\n| 5 | Repeat Steps 2–4 for spoofing files #2 and #3. | Signature-based detection for each; stored DocumentFormat (if accepted) matches actual content; rejected cases provide descriptive errors and no persistence. |\n\\*\\*Overall Expected Result\\*\\*\nSignature-based detection is enforced; extension spoofing does not bypass validation; system either accepts as the true type or rejects with descriptive errors (policy-dependent).\n\\*\\*Priority:\\*\\* High\n\\*\\*Type:\\*\\* Security / Negative / Validation\n### TC-004 — Verify handling of encrypted/password-protected documents\n\\*\\*Objective\\*\\*\nEnsure encrypted/password-protected documents trigger a password prompt or appropriate handling, and that successful password entry (if supported) allows intake; incorrect/missing password prevents intake.\n\\*\\*Acceptance Criteria\\*\\*\nAC10\n\\*\\*Preconditions\\*\\*\n1. Same as TC-001.\n1. Ability to respond to a password prompt if UI exists (or provide password via API if supported).\n\\*\\*Test Data\\*\\*\n| Case | File | Password |\n|---|---|---|\n| Wrong password | protected.pdf |  |\n| Correct password | protected.pdf |  |\n| Optional (if supported) | protected.docx |  |\n\\*\\*Steps\\*\\*\n| Step | Action | Expected Result |\n|---|---|---|\n| 1 | Open the Document Intake upload interface (or prepare API request). | Upload capability is available. |\n| 2 | Upload protected.pdf. | System detects encryption and triggers password prompt or explicit password-required handling response (exact mechanism not specified). |\n| 3 | Provide  when prompted (or submit without password if supported). | Validation fails; descriptive error; no DocumentID; no persistence. |\n| 4 | Retry upload and provide . | Validation succeeds; success confirmation with non-empty DocumentID. |\n| 5 | Retrieve stored record by DocumentID and validate persisted fields (DocumentFormat, metadata, MD5, file path reference). | All required fields stored correctly; original file stored/retrievable, consistent with TC-001 validations. |\n| 6 | Repeat Steps 2–5 for protected.docx if password-protected Office formats are supported in scope. | Same behavior: password required; wrong/missing rejected; correct accepted with persistence. |\n\\*\\*Overall Expected Result\\*\\*\nEncrypted documents trigger password handling; wrong/missing password prevents intake; correct password allows successful intake with normal persistence.\n\\*\\*Priority:\\*\\* Medium\n\\*\\*Type:\\*\\* Alternate Flow / Security / Validation",
+    "status":  {
+                   "name":  "Open",
+                   "category":  "To Do",
+                   "color":  "default"
+               },
+    "issue_type":  {
+                       "name":  "Story"
+                   },
+    "priority":  {
+                     "name":  "Critical"
+                 },
+    "project":  {
+                    "key":  "EPMCDMETST",
+                    "name":  "EPM-CDME-TEST",
+                    "avatar_url":  "https://jiraeu.epam.com/secure/projectavatar?avatarId=59003"
+                },
+    "worklog":  {
+                    "startAt":  0,
+                    "maxResults":  20,
+                    "total":  0,
+                    "worklogs":  [
+
+                                 ]
+                },
+    "assignee":  {
+                     "display_name":  "Unassigned"
+                 },
+    "reporter":  {
+                     "account_id":  null,
+                     "display_name":  "Nisha Binoy",
+                     "name":  "Nisha_Binoy@epam.com",
+                     "email":  "Nisha_Binoy@epam.com",
+                     "avatar_url":  "https://jiraeu.epam.com/secure/useravatar?avatarId=10122",
+                     "key":  "JIRAUSER203624"
+                 },
+    "labels":  [
+                   "AI-Generated",
+                   "AI/Run"
+               ],
+    "created":  "2026-06-30 11:18:08 India Standard Time",
+    "updated":  "2026-09-30 23:22:00 India Standard Time",
+    "changelogs":  [
+                       {
+                           "items":  [
+                                         {
+                                             "field":  "Link",
+                                             "fieldtype":  "jira",
+                                             "to_string":  "This issue blocks EPMCDMETST-52518",
+                                             "to_id":  "EPMCDMETST-52518"
+                                         }
+                                     ],
+                           "author":  {
+                                          "account_id":  null,
+                                          "display_name":  "Nisha Binoy",
+                                          "name":  "Nisha_Binoy@epam.com",
+                                          "email":  "Nisha_Binoy@epam.com",
+                                          "avatar_url":  "https://jiraeu.epam.com/secure/useravatar?avatarId=10122",
+                                          "key":  "JIRAUSER203624"
+                                      },
+                           "created":  "2026-06-30T05:55:26.292000+00:00"
+                       },
+                       {
+                           "items":  [
+                                         {
+                                             "field":  "Link",
+                                             "fieldtype":  "jira",
+                                             "to_string":  "This issue is_blocked_by EPMCDMETST-52509",
+                                             "to_id":  "EPMCDMETST-52509"
+                                         }
+                                     ],
+                           "author":  {
+                                          "account_id":  null,
+                                          "display_name":  "Nisha Binoy",
+                                          "name":  "Nisha_Binoy@epam.com",
+                                          "email":  "Nisha_Binoy@epam.com",
+                                          "avatar_url":  "https://jiraeu.epam.com/secure/useravatar?avatarId=10122",
+                                          "key":  "JIRAUSER203624"
+                                      },
+                           "created":  "2026-06-30T05:55:33.421000+00:00"
+                       },
+                       {
+                           "items":  [
+                                         {
+                                             "field":  "Link",
+                                             "fieldtype":  "jira",
+                                             "to_string":  "This issue is_blocked_by EPMCDMETST-52510",
+                                             "to_id":  "EPMCDMETST-52510"
+                                         }
+                                     ],
+                           "author":  {
+                                          "account_id":  null,
+                                          "display_name":  "Nisha Binoy",
+                                          "name":  "Nisha_Binoy@epam.com",
+                                          "email":  "Nisha_Binoy@epam.com",
+                                          "avatar_url":  "https://jiraeu.epam.com/secure/useravatar?avatarId=10122",
+                                          "key":  "JIRAUSER203624"
+                                      },
+                           "created":  "2026-06-30T05:55:40.901000+00:00"
+                       },
+                       {
+                           "items":  [
+                                         {
+                                             "field":  "Link",
+                                             "fieldtype":  "jira",
+                                             "to_string":  "This issue is_blocked_by EPMCDMETST-52514",
+                                             "to_id":  "EPMCDMETST-52514"
+                                         }
+                                     ],
+                           "author":  {
+                                          "account_id":  null,
+                                          "display_name":  "Nisha Binoy",
+                                          "name":  "Nisha_Binoy@epam.com",
+                                          "email":  "Nisha_Binoy@epam.com",
+                                          "avatar_url":  "https://jiraeu.epam.com/secure/useravatar?avatarId=10122",
+                                          "key":  "JIRAUSER203624"
+                                      },
+                           "created":  "2026-06-30T05:56:28.314000+00:00"
+                       },
+                       {
+                           "items":  [
+                                         {
+                                             "field":  "priority",
+                                             "fieldtype":  "jira",
+                                             "from_string":  "Major",
+                                             "to_string":  "Critical",
+                                             "from_id":  "3",
+                                             "to_id":  "2"
+                                         }
+                                     ],
+                           "author":  {
+                                          "account_id":  null,
+                                          "display_name":  "Nisha Binoy",
+                                          "name":  "Nisha_Binoy@epam.com",
+                                          "email":  "Nisha_Binoy@epam.com",
+                                          "avatar_url":  "https://jiraeu.epam.com/secure/useravatar?avatarId=10122",
+                                          "key":  "JIRAUSER203624"
+                                      },
+                           "created":  "2026-06-30T05:56:57.389000+00:00"
+                       },
+                       {
+                           "items":  [
+                                         {
+                                             "field":  "description",
+                                             "fieldtype":  "jira",
+                                             "from_string":  "h2. Primary User Story\n\nAs a system administrator, I want the system to validate and accept PDF, DOC, RTF, and XLS files for processing so that documents in multiple formats can enter the processing pipeline and invalid files are rejected with appropriate error messages.\n\nh2. Specification Reference\n\nPages 1-2 (Document Ingestion and Batch Processing), Page 3 (Document Intake Module)\n\nh2. Description\n\nImplement the Document Intake Module that handles the receipt and validation of PDF, DOC, RTF, and XLS files for processing. The module will validate document format compatibility, file size constraints, and document integrity before accepting documents into the processing queue.\n\nh2. Requirements\n\n* Accept PDF files of any version up to PDF 2.0 (ISO-32000-2)\n* Accept DOC files (Microsoft Word .doc format)\n* Accept RTF files (Rich Text Format)\n* Accept XLS files (Microsoft Excel .xls format)\n* Accept DOCX files (Microsoft Word .docx format)\n* Accept XLSX files (Microsoft Excel .xlsx format)\n* Validate file format and structure integrity for each format type\n* Support document files up to 100MB in size\n* Generate unique document identifiers (DocumentID) for each uploaded file\n* Calculate MD5 hash for document integrity verification\n* Validate file metadata and extract basic information (filename, size, upload date, format type)\n* Store original files with appropriate file path references\n* Handle encrypted/password-protected documents and prompt for passwords when needed\n* Sanitize all inputs to prevent injection attacks\n* Provide detailed error messages for validation failures\n* Detect document format automatically based on file signature (magic bytes), not just extension\n\nh2. Preconditions\n\n* Relational database is configured and accessible\n* File storage system is available with appropriate permissions\n* System has sufficient storage capacity\n* Document processing libraries are installed (PyPDF2/PyMuPDF for PDF, python-docx for DOC/DOCX, pyrtf for RTF, openpyxl/xlrd for XLS/XLSX)\n\nh2. Scenarios of Use\n\n# Administrator uploads a valid document file (PDF, DOC, RTF, or XLS) through the batch upload interface\n# System detects document format using file signature validation\n# System validates format-specific structure and version compatibility\n# System checks file size against maximum limit (100MB)\n# System generates unique DocumentID and calculates MD5 hash\n# System stores DocumentFormat field (PDF, DOC, RTF, XLS, DOCX, XLSX)\n# System stores file in designated storage location\n# System creates database record with document information including format\n# System returns success confirmation with DocumentID\n\nh2. Affected Areas\n\n* Document Intake Module\n* Database Management Module (Documents table - add DocumentFormat field)\n* File storage system\n* API Layer\n* Format detection services\n* Document parsing library dependencies\n\nh2. Acceptance Criteria\n\n* PDF files up to version 2.0 are successfully validated and accepted\n* DOC/DOCX files (Microsoft Word) are successfully validated and accepted\n* RTF files are successfully validated and accepted\n* XLS/XLSX files (Microsoft Excel) are successfully validated and accepted\n* Files exceeding 100MB are rejected with appropriate error message\n* Each document receives a unique DocumentID upon successful validation\n* Document format is correctly identified and stored in DocumentFormat field\n* MD5 hash is calculated and stored for integrity verification\n* Invalid or corrupted files (any format) are rejected with descriptive error messages\n* Encrypted/password-protected documents trigger password prompt or appropriate handling\n* All file metadata (filename, size, upload date, format) is correctly extracted and stored\n* Original files are stored with correct file path references in the database\n* Format detection works based on file signature, not just extension (prevents spoofing)",
+                                             "to_string":  "h2. Primary User Story\n\nAs a system administrator, I want the system to validate and accept PDF, DOC, RTF, and XLS files for processing so that documents in multiple formats can enter the processing pipeline and invalid files are rejected with appropriate error messages.\n\nh2. Specification Reference\n\nPages 1-2 (Document Ingestion and Batch Processing), Page 3 (Document Intake Module)\n\nh2. Description\n\nImplement the Document Intake Module that handles the receipt and validation of PDF, DOC, RTF, and XLS files for processing. The module will validate document format compatibility, file size constraints, and document integrity before accepting documents into the processing queue.\n\nh2. Requirements\n\n* Accept PDF files of any version up to PDF 2.0 (ISO-32000-2)\n* Accept DOC files (Microsoft Word .doc format)\n* Accept RTF files (Rich Text Format)\n* Accept XLS files (Microsoft Excel .xls format)\n* Accept DOCX files (Microsoft Word .docx format)\n* Accept XLSX files (Microsoft Excel .xlsx format)\n* Validate file format and structure integrity for each format type\n* Support document files up to 100MB in size\n* Generate unique document identifiers (DocumentID) for each uploaded file\n* Calculate MD5 hash for document integrity verification\n* Validate file metadata and extract basic information (filename, size, upload date, format type)\n* Store original files with appropriate file path references\n* Handle encrypted/password-protected documents and prompt for passwords when needed\n* Sanitize all inputs to prevent injection attacks\n* Provide detailed error messages for validation failures\n* Detect document format automatically based on file signature (magic bytes), not just extension\n\nh2. Preconditions\n\n* Relational database is configured and accessible\n* File storage system is available with appropriate permissions\n* System has sufficient storage capacity\n* Document processing libraries are installed (PyPDF2/PyMuPDF for PDF, python-docx for DOC/DOCX, pyrtf for RTF, openpyxl/xlrd for XLS/XLSX)\n\nh2. Scenarios of Use\n\n# Administrator uploads a valid document file (PDF, DOC, RTF, or XLS) through the batch upload interface\n# System detects document format using file signature validation\n# System validates format-specific structure and version compatibility\n# System checks file size against maximum limit (100MB)\n# System generates unique DocumentID and calculates MD5 hash\n# System stores DocumentFormat field (PDF, DOC, RTF, XLS, DOCX, XLSX)\n# System stores file in designated storage location\n# System creates database record with document information including format\n# System returns success confirmation with DocumentID\n\nh2. Affected Areas\n\n* Document Intake Module\n* Database Management Module (Documents table - add DocumentFormat field)\n* File storage system\n* API Layer\n* Format detection services\n* Document parsing library dependencies\n\nh2. Acceptance Criteria\n\n* PDF files up to version 2.0 are successfully validated and accepted\n* DOC/DOCX files (Microsoft Word) are successfully validated and accepted\n* RTF files are successfully validated and accepted\n* XLS/XLSX files (Microsoft Excel) are successfully validated and accepted\n* Files exceeding 100MB are rejected with appropriate error message\n* Each document receives a unique DocumentID upon successful validation\n* Document format is correctly identified and stored in DocumentFormat field\n* MD5 hash is calculated and stored for integrity verification\n* Invalid or corrupted files (any format) are rejected with descriptive error messages\n* Encrypted/password-protected documents trigger password prompt or appropriate handling\n* All file metadata (filename, size, upload date, format) is correctly extracted and stored\n* Original files are stored with correct file path references in the database\n* Format detection works based on file signature, not just extension (prevents spoofing)\n\n----\n\nh2. Test Cases\n\nh3. TC-001 — Verify successful intake/validation and persistence for all supported document formats\n\n*Objective*  \nEnsure supported formats are accepted end-to-end: signature-based detection, integrity validation, size check, DocumentID generation, metadata + MD5 + format + file path persistence, and success response.\n\n*Acceptance Criteria*  \nAC1, AC2, AC3, AC4, AC6, AC7, AC8, AC11, AC12, AC13\n\n*Preconditions*\n# Document Intake Module deployed and reachable (batch upload interface or API endpoint available).\n# Relational DB accessible and “Documents” table includes DocumentFormat field.\n# File storage system accessible with required permissions.\n# Ability to retrieve stored document record by DocumentID (via API/admin UI/DB query) is available to QA.\n\n*Test Data (Supported format matrix — run same flow once per row)*\n|| Format || File || Constraints ||\n| PDF | valid_pdf_17.pdf | PDF v1.7; size \u003c 100MB |\n| PDF | valid_pdf_20.pdf | PDF v2.0; size \u003c 100MB |\n| DOC | valid_doc.doc | valid; size \u003c 100MB |\n| DOCX | valid_docx.docx | valid; size \u003c 100MB |\n| RTF | valid_rtf.rtf | valid; size \u003c 100MB |\n| XLS | valid_xls.xls | valid; size \u003c 100MB |\n| XLSX | valid_xlsx.xlsx | valid; size \u003c 100MB |\n\n*Steps*\n|| Step || Action || Expected Result ||\n| 1 | Open the Document Intake batch upload interface (or prepare an upload request via the supported API). | Upload capability is available and ready to accept a file input. |\n| 2 | Select the test file for the current matrix row and initiate upload/validation. | System accepts submission and begins validation (no immediate unsupported-format error). |\n| 3 | Wait for validation to complete and capture returned DocumentID from the success response/confirmation. | Success confirmation returned and DocumentID present and non-empty. |\n| 4 | Repeat Steps 1–3 for each file in the supported format matrix; collect all DocumentIDs. | Each upload is successful and each DocumentID is unique across all successful uploads. |\n| 5 | For each DocumentID, retrieve the corresponding document record (via API/admin UI/DB query). | Exactly one record exists per DocumentID. |\n| 6 | Validate persisted metadata fields for each record: filename, size, upload date, and format/DocumentFormat. | Stored values match the uploaded file and DocumentFormat matches actual file type. |\n| 7 | Validate MD5 persistence: compare stored MD5 to locally computed MD5 of uploaded file bytes. | Stored MD5 present and equals locally computed MD5. |\n| 8 | Validate storage persistence: verify record contains file path/reference and confirm original file exists at that location (or is retrievable using that reference). | File path/reference present and stored file accessible and corresponds to uploaded content. |\n\n*Overall Expected Result*  \nAll supported formats are accepted; unique DocumentIDs are generated; metadata, DocumentFormat, MD5, and file path are persisted correctly and the stored files are retrievable.\n\n*Priority:* High  \n*Type:* E2E / Integration / Persistence\n\nh3. TC-002 — Verify rejection for oversize and corrupted/invalid files with descriptive errors\n\n*Objective*  \nEnsure validation failures are handled: oversize \u003e100MB and invalid/corrupted structure are rejected with descriptive error messages and no successful persistence.\n\n*Acceptance Criteria*  \nAC5, AC9\n\n*Preconditions*\n# Same as TC-001.\n# Ability to verify no record created by searching DB/API using filename/time window (since no DocumentID should be issued).\n\n*Test Data (Negative matrix — run once per row)*\n|| Scenario || File || Notes ||\n| Oversize | oversize_valid_pdf.pdf (or oversize_valid_doc.docx) | Any supported format; size \u003e 100MB |\n| Corrupted PDF | corrupt.pdf | size \u003c 100MB; invalid/broken structure |\n| Corrupted DOC/DOCX | corrupt.docx | size \u003c 100MB; unopenable/invalid package |\n| Corrupted XLS/XLSX | corrupt.xlsx | size \u003c 100MB; unopenable/invalid workbook |\n| Corrupted RTF | corrupt.rtf | size \u003c 100MB; invalid header/structure |\n\n*Steps*\n|| Step || Action || Expected Result ||\n| 1 | Open the Document Intake upload interface (or prepare API request). | Upload capability is available. |\n| 2 | Upload Negative matrix row A (\u003e100MB). | Validation fails; upload rejected with error indicating file exceeds maximum size (100MB); no success confirmation. |\n| 3 | Verify system does not return a DocumentID for row A. | No DocumentID issued. |\n| 4 | Verify persistence did not occur for row A (search by filename and upload timestamp window in DB/API/logged intake results). | No document record/file created for rejected upload (or any partial artifacts are not present/are rolled back), per observable system behavior. |\n| 5 | Repeat Steps 1–4 for each corrupted/invalid file row (B–E). | Each is rejected with descriptive error indicating invalid/corrupted content/structure; no DocumentID issued; no persisted document record/file created. |\n\n*Overall Expected Result*  \nInvalid uploads are rejected with descriptive errors; no DocumentID is issued; no document records/files are persisted.\n\n*Priority:* High  \n*Type:* Negative / Validation / Integration\n\nh3. TC-003 — Verify signature-based format detection blocks extension spoofing\n\n*Objective*  \nEnsure format detection is based on file signature (magic bytes) not file extension; spoofed files are rejected (or handled as their true type) with appropriate error behavior.\n\n*Acceptance Criteria*  \nAC7, AC13\n\n*Preconditions*\n# Same as TC-001.\n# Ability to observe system-reported detected format (error detail or stored DocumentFormat if accepted).\n\n*Test Data (Spoofing matrix)*\n|| Case || File || Actual content || Extension ||\n| 1 | pdf_renamed_as_docx.docx | PDF | .docx |\n| 2 | docx_renamed_as_pdf.pdf | DOCX | .pdf |\n| 3 | xlsx_renamed_as_rtf.rtf | XLSX | .rtf |\n\n*Steps*\n|| Step || Action || Expected Result ||\n| 1 | Open the Document Intake upload interface (or prepare API request). | Upload capability is available. |\n| 2 | Upload spoofing file #1. | System detects true format based on signature (PDF) rather than trusting extension; outcome consistent with that detection (accept as PDF or reject if mismatch policy exists—not specified). |\n| 3 | If accepted, capture DocumentID and retrieve stored record. | DocumentFormat reflects true detected format, not spoofed extension. |\n| 4 | If rejected, verify error message is descriptive and indicates a format/signature mismatch or unsupported/invalid content based on detection. | Descriptive validation error; no DocumentID. |\n| 5 | Repeat Steps 2–4 for spoofing files #2 and #3. | Signature-based detection for each; stored DocumentFormat (if accepted) matches actual content; rejected cases provide descriptive errors and no persistence. |\n\n*Overall Expected Result*  \nSignature-based detection is enforced; extension spoofing does not bypass validation; system either accepts as the true type or rejects with descriptive errors (policy-dependent).\n\n*Priority:* High  \n*Type:* Security / Negative / Validation\n\nh3. TC-004 — Verify handling of encrypted/password-protected documents\n\n*Objective*  \nEnsure encrypted/password-protected documents trigger a password prompt or appropriate handling, and that successful password entry (if supported) allows intake; incorrect/missing password prevents intake.\n\n*Acceptance Criteria*  \nAC10\n\n*Preconditions*\n# Same as TC-001.\n# Ability to respond to a password prompt if UI exists (or provide password via API if supported).\n\n*Test Data*\n|| Case || File || Password ||\n| Wrong password | protected.pdf | \u003cwrong_password\u003e |\n| Correct password | protected.pdf | \u003ccorrect_password\u003e |\n| Optional (if supported) | protected.docx | \u003ccorrect_password\u003e |\n\n*Steps*\n|| Step || Action || Expected Result ||\n| 1 | Open the Document Intake upload interface (or prepare API request). | Upload capability is available. |\n| 2 | Upload protected.pdf. | System detects encryption and triggers password prompt or explicit password-required handling response (exact mechanism not specified). |\n| 3 | Provide \u003cwrong_password\u003e when prompted (or submit without password if supported). | Validation fails; descriptive error; no DocumentID; no persistence. |\n| 4 | Retry upload and provide \u003ccorrect_password\u003e. | Validation succeeds; success confirmation with non-empty DocumentID. |\n| 5 | Retrieve stored record by DocumentID and validate persisted fields (DocumentFormat, metadata, MD5, file path reference). | All required fields stored correctly; original file stored/retrievable, consistent with TC-001 validations. |\n| 6 | Repeat Steps 2–5 for protected.docx if password-protected Office formats are supported in scope. | Same behavior: password required; wrong/missing rejected; correct accepted with persistence. |\n\n*Overall Expected Result*  \nEncrypted documents trigger password handling; wrong/missing password prevents intake; correct password allows successful intake with normal persistence.\n\n*Priority:* Medium  \n*Type:* Alternate Flow / Security / Validation\n"
+                                         }
+                                     ],
+                           "author":  {
+                                          "account_id":  null,
+                                          "display_name":  "Sumanta Swain",
+                                          "name":  "sumanta_swain@epam.com",
+                                          "email":  "sumanta_swain@epam.com",
+                                          "avatar_url":  "https://jiraeu.epam.com/secure/useravatar?avatarId=10122",
+                                          "key":  "JIRAUSER264577"
+                                      },
+                           "created":  "2026-09-30T17:52:00.237000+00:00"
+                       }
+                   ],
+    "issuelinks":  [
+                       {
+                           "id":  "14442904",
+                           "type":  {
+                                        "id":  "12300",
+                                        "name":  "Blocks",
+                                        "inward":  "is_blocked_by",
+                                        "outward":  "blocks",
+                                        "self":  "https://jiraeu.epam.com/rest/api/2/issueLinkType/12300"
+                                    },
+                           "outward_issue":  {
+                                                 "id":  "14168983",
+                                                 "key":  "EPMCDMETST-52518",
+                                                 "self":  "https://jiraeu.epam.com/rest/api/2/issue/14168983",
+                                                 "fields":  {
+                                                                "summary":  "[BE] Relational Database Schema Implementation with Multi-Format Support",
+                                                                "status":  {
+                                                                               "name":  "Open",
+                                                                               "category":  "To Do",
+                                                                               "color":  "default"
+                                                                           },
+                                                                "priority":  {
+                                                                                 "name":  "Critical"
+                                                                             },
+                                                                "issuetype":  {
+                                                                                  "name":  "Story"
+                                                                              }
+                                                            }
+                                             }
+                       },
+                       {
+                           "id":  "14442906",
+                           "type":  {
+                                        "id":  "12300",
+                                        "name":  "Blocks",
+                                        "inward":  "is_blocked_by",
+                                        "outward":  "blocks",
+                                        "self":  "https://jiraeu.epam.com/rest/api/2/issueLinkType/12300"
+                                    },
+                           "inward_issue":  {
+                                                "id":  "14168971",
+                                                "key":  "EPMCDMETST-52509",
+                                                "self":  "https://jiraeu.epam.com/rest/api/2/issue/14168971",
+                                                "fields":  {
+                                                               "summary":  "[BE] Text-Based Document Parsing Engine for Multiple Formats",
+                                                               "status":  {
+                                                                              "name":  "Open",
+                                                                              "category":  "To Do",
+                                                                              "color":  "default"
+                                                                          },
+                                                               "priority":  {
+                                                                                "name":  "Critical"
+                                                                            },
+                                                               "issuetype":  {
+                                                                                 "name":  "Story"
+                                                                             }
+                                                           }
+                                            }
+                       },
+                       {
+                           "id":  "14442909",
+                           "type":  {
+                                        "id":  "12300",
+                                        "name":  "Blocks",
+                                        "inward":  "is_blocked_by",
+                                        "outward":  "blocks",
+                                        "self":  "https://jiraeu.epam.com/rest/api/2/issueLinkType/12300"
+                                    },
+                           "inward_issue":  {
+                                                "id":  "14168973",
+                                                "key":  "EPMCDMETST-52510",
+                                                "self":  "https://jiraeu.epam.com/rest/api/2/issue/14168973",
+                                                "fields":  {
+                                                               "summary":  "[BE] OCR Engine Integration for Scanned Documents in Multiple Formats",
+                                                               "status":  {
+                                                                              "name":  "Open",
+                                                                              "category":  "To Do",
+                                                                              "color":  "default"
+                                                                          },
+                                                               "priority":  {
+                                                                                "name":  "Critical"
+                                                                            },
+                                                               "issuetype":  {
+                                                                                 "name":  "Story"
+                                                                             }
+                                                           }
+                                            }
+                       },
+                       {
+                           "id":  "14442926",
+                           "type":  {
+                                        "id":  "12300",
+                                        "name":  "Blocks",
+                                        "inward":  "is_blocked_by",
+                                        "outward":  "blocks",
+                                        "self":  "https://jiraeu.epam.com/rest/api/2/issueLinkType/12300"
+                                    },
+                           "inward_issue":  {
+                                                "id":  "14168978",
+                                                "key":  "EPMCDMETST-52514",
+                                                "self":  "https://jiraeu.epam.com/rest/api/2/issue/14168978",
+                                                "fields":  {
+                                                               "summary":  "[FE] Batch Upload Interface with Multi-Format Support and Drag-and-Drop",
+                                                               "status":  {
+                                                                              "name":  "Open",
+                                                                              "category":  "To Do",
+                                                                              "color":  "default"
+                                                                          },
+                                                               "priority":  {
+                                                                                "name":  "Major"
+                                                                            },
+                                                               "issuetype":  {
+                                                                                 "name":  "Story"
+                                                                             }
+                                                           }
+                                            }
+                       }
+                   ],
+    "customfield_38401":  {
+                              "value":  [
+                                            "A+"
+                                        ]
+                          },
+    "customfield_34834":  {
+                              "value":  null
+                          },
+    "customfield_17702":  {
+                              "value":  null
+                          },
+    "customfield_22601":  {
+                              "value":  null
+                          },
+    "customfield_31100":  {
+                              "value":  null
+                          },
+    "customfield_11700":  {
+                              "value":  null
+                          },
+    "customfield_35700":  {
+                              "value":  null
+                          },
+    "customfield_13206":  {
+                              "value":  null
+                          },
+    "customfield_11701":  {
+                              "value":  null
+                          },
+    "customfield_31900":  {
+                              "value":  null
+                          },
+    "customfield_35706":  {
+                              "value":  null
+                          },
+    "customfield_34859":  {
+                              "value":  null
+                          },
+    "customfield_35705":  {
+                              "value":  null
+                          },
+    "customfield_35704":  {
+                              "value":  null
+                          },
+    "customfield_35703":  {
+                              "value":  null
+                          },
+    "customfield_35702":  {
+                              "value":  null
+                          },
+    "customfield_17800":  {
+                              "value":  null
+                          },
+    "customfield_35701":  {
+                              "value":  null
+                          },
+    "customfield_32200":  {
+                              "value":  null
+                          },
+    "customfield_36800":  {
+                              "value":  null
+                          },
+    "customfield_35710":  {
+                              "value":  "X - Delta Flow"
+                          },
+    "customfield_32202":  {
+                              "value":  null
+                          },
+    "customfield_32201":  {
+                              "value":  null
+                          },
+    "customfield_30704":  {
+                              "value":  null
+                          },
+    "customfield_32204":  {
+                              "value":  null
+                          },
+    "customfield_32203":  {
+                              "value":  null
+                          },
+    "customfield_11801":  {
+                              "value":  null
+                          },
+    "customfield_35720":  {
+                              "value":  null
+                          },
+    "customfield_34873":  {
+                              "value":  null
+                          },
+    "customfield_11000":  {
+                              "value":  null
+                          },
+    "customfield_15602":  {
+                              "value":  null
+                          },
+    "customfield_13301":  {
+                              "value":  null
+                          },
+    "customfield_34401":  {
+                              "value":  "0.0"
+                          },
+    "customfield_34885":  {
+                              "value":  null
+                          },
+    "customfield_34402":  {
+                              "value":  "0.0"
+                          },
+    "customfield_14504":  {
+                              "value":  null
+                          },
+    "customfield_34400":  {
+                              "value":  null
+                          },
+    "customfield_26100":  {
+                              "value":  null
+                          },
+    "customfield_26102":  {
+                              "value":  null
+                          },
+    "customfield_20500":  {
+                              "value":  null
+                          },
+    "customfield_30609":  {
+                              "value":  null
+                          },
+    "customfield_30605":  {
+                              "value":  null
+                          },
+    "customfield_30606":  {
+                              "value":  null
+                          },
+    "customfield_23518":  {
+                              "value":  null
+                          },
+    "customfield_30607":  {
+                              "value":  null
+                          },
+    "customfield_30602":  {
+                              "value":  null
+                          },
+    "customfield_12200":  {
+                              "value":  null
+                          },
+    "customfield_30603":  {
+                              "value":  null
+                          },
+    "customfield_30604":  {
+                              "value":  null
+                          },
+    "customfield_34405":  {
+                              "value":  "Undefined"
+                          },
+    "customfield_14500":  {
+                              "value":  "EPMCDMETST-52503"
+                          },
+    "customfield_12203":  {
+                              "value":  null
+                          },
+    "customfield_30600":  {
+                              "value":  null
+                          },
+    "customfield_11900":  {
+                              "value":  null
+                          },
+    "customfield_34895":  {
+                              "value":  null
+                          },
+    "customfield_37004":  {
+                              "value":  [
+                                            "MK"
+                                        ]
+                          },
+    "customfield_40400":  {
+                              "value":  null
+                          },
+    "customfield_37000":  {
+                              "value":  0.0
+                          },
+    "customfield_40401":  {
+                              "value":  null
+                          },
+    "customfield_21703":  {
+                              "value":  null
+                          },
+    "customfield_25700":  {
+                              "value":  "2|iftx00:"
+                          },
+    "customfield_16110":  {
+                              "value":  null
+                          },
+    "customfield_30612":  {
+                              "value":  null
+                          },
+    "customfield_32911":  {
+                              "value":  null
+                          },
+    "customfield_30613":  {
+                              "value":  null
+                          },
+    "customfield_38105":  {
+                              "value":  "Negligible"
+                          },
+    "customfield_19501":  {
+                              "value":  null
+                          },
+    "customfield_30610":  {
+                              "value":  null
+                          },
+    "customfield_33325":  {
+                              "value":  null
+                          },
+    "customfield_30611":  {
+                              "value":  null
+                          },
+    "customfield_34899":  {
+                              "value":  "No"
+                          },
+    "customfield_33334":  {
+                              "value":  [
+                                            "Nisha_Binoy@epam.com(JIRAUSER203624)"
+                                        ]
+                          },
+    "customfield_34423":  {
+                              "value":  "Emakina"
+                          },
+    "customfield_10005":  {
+                              "value":  null
+                          },
+    "customfield_33335":  {
+                              "value":  null
+                          },
+    "customfield_34545":  {
+                              "value":  null
+                          },
+    "customfield_15816":  {
+                              "value":  "0.0"
+                          },
+    "customfield_10800":  {
+                              "value":  "9223372036854775807"
+                          },
+    "customfield_33333":  {
+                              "value":  "9223372036854775807"
+                          },
+    "customfield_34422":  {
+                              "value":  "No"
+                          },
+    "customfield_34541":  {
+                              "value":  null
+                          },
+    "customfield_20600":  {
+                              "value":  null
+                          },
+    "customfield_22900":  {
+                              "value":  null
+                          },
+    "customfield_30502":  {
+                              "value":  null
+                          },
+    "customfield_30503":  {
+                              "value":  null
+                          },
+    "customfield_14601":  {
+                              "value":  null
+                          },
+    "customfield_10001":  {
+                              "value":  null
+                          },
+    "customfield_10002":  {
+                              "value":  null
+                          },
+    "customfield_34549":  {
+                              "value":  null
+                          },
+    "customfield_30500":  {
+                              "value":  null
+                          },
+    "customfield_33336":  {
+                              "value":  "Open"
+                          },
+    "customfield_10004":  {
+                              "value":  null
+                          },
+    "customfield_33100":  {
+                              "value":  "N/A"
+                          },
+    "customfield_40301":  {
+                              "value":  null
+                          },
+    "customfield_40300":  {
+                              "value":  ""
+                          },
+    "customfield_15120":  {
+                              "value":  null
+                          },
+    "customfield_17303":  {
+                              "value":  null
+                          },
+    "customfield_11200":  {
+                              "value":  null
+                          },
+    "customfield_15129":  {
+                              "value":  null
+                          },
+    "customfield_21912":  {
+                              "value":  null
+                          },
+    "customfield_38132":  {
+                              "value":  "No"
+                          },
+    "customfield_15114":  {
+                              "value":  null
+                          },
+    "customfield_32702":  {
+                              "value":  null
+                          },
+    "customfield_38137":  {
+                              "value":  "Yes"
+                          },
+    "customfield_30400":  {
+                              "value":  "{}"
+                          },
+    "customfield_15109":  {
+                              "value":  null
+                          },
+    "customfield_35300":  {
+                              "value":  null
+                          },
+    "customfield_35540":  {
+                              "value":  null
+                          },
+    "customfield_14817":  {
+                              "value":  null
+                          },
+    "customfield_40202":  {
+                              "value":  null
+                          },
+    "customfield_40203":  {
+                              "value":  null
+                          },
+    "customfield_21901":  {
+                              "value":  "Unassigned"
+                          },
+    "customfield_40200":  {
+                              "value":  null
+                          },
+    "customfield_40201":  {
+                              "value":  null
+                          },
+    "customfield_27804":  {
+                              "value":  null
+                          },
+    "customfield_40100":  {
+                              "value":  null
+                          },
+    "customfield_35308":  {
+                              "value":  null
+                          },
+    "customfield_35548":  {
+                              "value":  null
+                          },
+    "customfield_35553":  {
+                              "value":  null
+                          },
+    "customfield_28902":  {
+                              "value":  null
+                          },
+    "customfield_24302":  {
+                              "value":  null
+                          },
+    "customfield_26604":  {
+                              "value":  null
+                          },
+    "customfield_26607":  {
+                              "value":  null
+                          },
+    "customfield_26606":  {
+                              "value":  null
+                          },
+    "customfield_38398":  {
+                              "value":  "Small"
+                          },
+    "customfield_34902":  {
+                              "value":  "(e.g. 16,6%)"
+                          },
+    "customfield_30300":  {
+                              "value":  null
+                          },
+    "customfield_34900":  {
+                              "value":  "Emakina Group"
+                          },
+    "customfield_34901":  {
+                              "value":  "https://share.emakina.net/display/PT/Our+supplier"
+                          },
+    "customfield_30301":  {
+                              "value":  null
+                          },
+    "customfield_18601":  {
+                              "value":  null
+                          },
+    "customfield_40101":  {
+                              "value":  null
+                          },
+    "customfield_25400":  {
+                              "value":  null
+                          },
+    "customfield_25401":  {
+                              "value":  null
+                          },
+    "customfield_15200":  {
+                              "value":  null
+                          },
+    "customfield_30317":  {
+                              "value":  null
+                          },
+    "customfield_35208":  {
+                              "value":  "All browsers"
+                          },
+    "customfield_35209":  {
+                              "value":  "No"
+                          },
+    "customfield_19008":  {
+                              "value":  null
+                          },
+    "customfield_15205":  {
+                              "value":  null
+                          },
+    "customfield_35215":  {
+                              "value":  null
+                          },
+    "customfield_35213":  {
+                              "value":  null
+                          },
+    "customfield_30200":  {
+                              "value":  null
+                          },
+    "customfield_36300":  {
+                              "value":  null
+                          },
+    "customfield_24200":  {
+                              "value":  null
+                          },
+    "customfield_32505":  {
+                              "value":  null
+                          },
+    "customfield_32506":  {
+                              "value":  null
+                          },
+    "customfield_35219":  {
+                              "value":  "No"
+                          },
+    "customfield_34801":  {
+                              "value":  null
+                          },
+    "customfield_30201":  {
+                              "value":  [
+
+                                        ]
+                          },
+    "customfield_30202":  {
+                              "value":  null
+                          },
+    "customfield_30203":  {
+                              "value":  null
+                          },
+    "customfield_10300":  {
+                              "value":  null
+                          },
+    "customfield_35220":  {
+                              "value":  null
+                          },
+    "customfield_35221":  {
+                              "value":  "- Boeken\r\n- Bedrijfsstempel\r\n- Fijne stiftjes voor workshops\r\n- Grote meetingroom post it’s\r\n- Schilmesjes\r\n- Ladeblokken\r\n- Aangepaste bureaustoel\r\n- Klanten geschenken\r\n- Pizza’s voor pizzasessies\r\n- Ontsmettende handgel\r\n- Voetenbankje\r\n- … "
+                          },
+    "customfield_40800":  {
+                              "value":  null
+                          },
+    "customfield_29900":  {
+                              "value":  "0"
+                          },
+    "customfield_34812":  {
+                              "value":  "9223372036854775807"
+                          },
+    "customfield_13004":  {
+                              "value":  null
+                          },
+    "customfield_15303":  {
+                              "value":  null
+                          },
+    "customfield_17723":  {
+                              "value":  null
+                          },
+    "customfield_36327":  {
+                              "value":  null
+                          },
+    "customfield_12701":  {
+                              "value":  null
+                          },
+    "customfield_12700":  {
+                              "value":  null
+                          },
+    "customfield_17718":  {
+                              "value":  null
+                          },
+    "customfield_36202":  {
+                              "value":  null
+                          },
+    "customfield_36681":  {
+                              "value":  null
+                          },
+    "customfield_17715":  {
+                              "value":  null
+                          },
+    "customfield_17713":  {
+                              "value":  null
+                          },
+    "customfield_27500":  {
+                              "value":  null
+                          },
+    "customfield_14501":  {
+                              "value":  "Core Document Processing Engine"
+                          },
+    "comments":  [
+
+                 ],
+    "remote_links":  [
+
+                     ],
+    "transitions":  [
+                        {
+                            "id":  11,
+                            "name":  "Start Progress"
+                        },
+                        {
+                            "id":  21,
+                            "name":  "Resolve"
+                        },
+                        {
+                            "id":  31,
+                            "name":  "Close"
+                        },
+                        {
+                            "id":  41,
+                            "name":  "Block"
+                        }
+                    ],
+    "watchers":  {
+                     "issue_key":  "EPMCDMETST-52508",
+                     "watcher_count":  1,
+                     "is_watching":  false,
+                     "watchers":  [
+
+                                  ]
+                 },
+    "worklogs":  [
+
+                 ]
+}
